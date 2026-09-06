@@ -13,3 +13,6 @@ Thumbs.db
 .vscode/
 .idea/
 backups/
+
+# Configuration locale de l outil (chemins specifiques a la machine)
+.claude/
