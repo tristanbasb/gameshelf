@@ -71,7 +71,7 @@ check "GET /api/lookup" "$(status "$BASE_URL/api/lookup?ean=3307210000000")" "20
 
 # --- 4. Creation ------------------------------------------------------------
 create_body="$(curl -sk -H 'Content-Type: application/json' \
-  -d '{"title":"__smoke_test__","platform":"Test","condition":"good","quantity":2,"ean":"3307219999999","has_manual":0}' \
+  -d '{"title":"__smoke_test__","platform":"Test","region":"PAL","serial":"SLES99999","condition":"good","quantity":2,"ean":"3307219999999","has_manual":0,"has_iso":1}' \
   "$BASE_URL/api/games")"
 
 CREATED_ID="$(printf '%s' "$create_body" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')"
@@ -94,7 +94,42 @@ if [[ -n "$CREATED_ID" ]]; then
     "$(curl -sk "$BASE_URL/api/lookup?ean=3307219999999")" '"found":true'
   contains "filtre incomplete=1 remonte le jeu sans notice" \
     "$(curl -sk "$BASE_URL/api/games?incomplete=1&search=__smoke_test__")" '__smoke_test__'
+  contains "recherche par serial" \
+    "$(curl -sk "$BASE_URL/api/games?search=SLES99999")" '__smoke_test__'
+  contains "filtre par region" \
+    "$(curl -sk "$BASE_URL/api/games?region=PAL&search=__smoke_test__")" '__smoke_test__'
 fi
+
+# --- Import au format d'un inventaire tenu a la main ------------------------
+# Colonnes francaises, colonne "Complet" enumeree, tiret pour une case vide,
+# et plateforme fournie separement parce que le fichier n'en a pas.
+#
+# Deux precautions d'ecriture, sans incidence sur ce qui est verifie :
+#   - separateur point-virgule, pour que "CD, Boite" n'ait pas besoin de
+#     guillemets qui ne survivraient pas a l'imbrication JSON ;
+#   - libelles sans accents, car selon le shell et la locale curl n'envoie pas
+#     l'UTF-8 intact. L'import accepte les deux graphies ("etat" comme
+#     "état"), les accents sont donc couverts par l'usage reel de l'interface.
+inventory_csv='Titre;Region;Etat;Serial;EAN;Complet;ISO;Notes\n__smoke_inv__;PAL;Tres bon;SLES12345;-;CD, Boite;Oui;-\n'
+check "POST /api/import (format inventaire)" "$(status -H 'Content-Type: application/json' \
+  -d "{\"format\":\"csv\",\"mode\":\"merge\",\"defaultPlatform\":\"PlayStation 2\",\"content\":\"$inventory_csv\"}" \
+  "$BASE_URL/api/import")" "200"
+
+inv_body="$(curl -sk "$BASE_URL/api/games?search=__smoke_inv__")"
+contains "  plateforme par defaut appliquee" "$inv_body" '"platform":"PlayStation 2"'
+contains "  region lue"                      "$inv_body" '"region":"PAL"'
+contains "  etat converti (Tres bon -> mint)" "$inv_body" '"condition":"mint"'
+contains "  « CD, Boite » : notice absente" "$inv_body" '"has_manual":0'
+contains "  serial lu"                       "$inv_body" '"serial":"SLES12345"'
+contains "  ISO lu"                          "$inv_body" '"has_iso":1'
+contains "  EAN vide sur un tiret"           "$inv_body" '"ean":""'
+contains "  « CD, Boite » : boite presente"  "$inv_body" '"has_box":1'
+# La jaquette n'est pas citee dans ce vocabulaire : elle ne doit pas etre
+# declaree manquante pour autant.
+contains "  jaquette non suivie, donc presente" "$inv_body" '"has_cover_art":1'
+
+inv_id="$(printf '%s' "$inv_body" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)"
+[[ -n "$inv_id" ]] && curl -sk -X DELETE "$BASE_URL/api/games/$inv_id" >/dev/null
 
 # --- 5. Validation des entrees ---------------------------------------------
 check "POST sans titre -> 400" "$(status -H 'Content-Type: application/json' \

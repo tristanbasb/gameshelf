@@ -13,8 +13,8 @@ const CONDITIONS = ['sealed', 'mint', 'good', 'fair', 'poor'];
 
 const state = {
   filters: {
-    search: '', platform: '', condition: '',
-    tag: '', favorite: '', incomplete: '',
+    search: '', platform: '', region: '', condition: '',
+    tag: '', favorite: '', incomplete: '', iso: '',
   },
   sort: 'created_at',
   dir: 'desc',
@@ -123,6 +123,7 @@ function renderSidebar() {
   };
 
   fillList('#filter-platform', meta.platforms, 'platform');
+  fillList('#filter-region', meta.regions, 'region', 10);
   fillList('#filter-tags', meta.tags, 'tag', 12);
 
   // Listes de saisie assistee des formulaires.
@@ -137,15 +138,17 @@ function renderSidebar() {
   $('#count-all').textContent = fmtNumber(totals.total || 0);
   $('#count-fav').textContent = fmtNumber(totals.favorites || 0);
   $('#count-incomplete').textContent = fmtNumber(totals.incomplete || 0);
+  $('#count-noiso').textContent = fmtNumber(totals.without_iso || 0);
 
   const noFilter = !Object.values(state.filters).some(Boolean);
+  const QUICK_STATE = {
+    favorite: () => state.filters.favorite === '1',
+    incomplete: () => state.filters.incomplete === '1',
+    noiso: () => state.filters.iso === '0',
+  };
   $$('[data-quick]').forEach((btn) => {
-    const quick = btn.dataset.quick;
-    const active =
-      quick === 'favorite' ? state.filters.favorite === '1'
-        : quick === 'incomplete' ? state.filters.incomplete === '1'
-          : noFilter;
-    btn.classList.toggle('active', active);
+    const test = QUICK_STATE[btn.dataset.quick];
+    btn.classList.toggle('active', test ? test() : noFilter);
   });
 }
 
@@ -156,10 +159,12 @@ function renderSidebar() {
 const CHIP_LABELS = {
   search: 'Recherche',
   platform: 'Plateforme',
+  region: 'Région',
   condition: 'État',
   tag: 'Tag',
   favorite: 'Favoris',
   incomplete: 'Incomplets',
+  iso: 'ISO',
 };
 
 function renderChips() {
@@ -174,6 +179,7 @@ function renderChips() {
   const shownValue = (key, value) => {
     if (key === 'condition') return CONDITION_LABELS[value] || value;
     if (key === 'favorite' || key === 'incomplete') return 'oui';
+    if (key === 'iso') return value === '1' ? 'présent' : 'absent';
     return value;
   };
 
@@ -231,7 +237,7 @@ function gameCard(game) {
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', `Modifier ${game.title}`);
 
-  const meta = esc(game.platform);
+  const meta = [game.platform, game.region].filter(Boolean).map(esc).join(' · ');
   const missing = missingBadge(game);
 
   card.innerHTML = `
@@ -265,9 +271,12 @@ function gameCard(game) {
 const TABLE_COLUMNS = [
   { key: 'title', label: 'Titre' },
   { key: 'platform', label: 'Plateforme' },
+  { key: 'region', label: 'Région' },
   { key: 'quantity', label: 'Qté' },
   { key: null, label: 'État' },
   { key: null, label: 'Manque' },
+  { key: null, label: 'ISO' },
+  { key: 'serial', label: 'Serial' },
   { key: null, label: 'Code-barres' },
   { key: 'created_at', label: 'Ajouté le' },
 ];
@@ -296,6 +305,7 @@ function renderTable(items) {
           </span>
         </td>
         <td>${esc(game.platform) || '—'}</td>
+        <td>${esc(game.region) || '—'}</td>
         <td style="font-variant-numeric:tabular-nums">${game.quantity}</td>
         <td>
           <span class="badge">
@@ -304,6 +314,8 @@ function renderTable(items) {
           </span>
         </td>
         <td>${missing.length ? `<span class="missing">${esc(missing.join(', '))}</span>` : '—'}</td>
+        <td>${game.has_iso ? 'Oui' : '—'}</td>
+        <td style="font-variant-numeric:tabular-nums">${esc(game.serial) || '—'}</td>
         <td style="font-variant-numeric:tabular-nums">${esc(game.ean) || '—'}</td>
         <td>${esc(fmtDate(game.created_at))}</td>
       </tr>`;
@@ -656,7 +668,8 @@ async function showLookup(code, modal, result, status) {
 
 const FORM_FIELDS = [
   ['f-title', 'title'], ['f-cover', 'cover_url'], ['f-platform', 'platform'],
-  ['f-ean', 'ean'], ['f-quantity', 'quantity'], ['f-condition', 'condition'],
+  ['f-region', 'region'], ['f-serial', 'serial'], ['f-ean', 'ean'],
+  ['f-quantity', 'quantity'], ['f-condition', 'condition'],
   ['f-tags', 'tags'], ['f-notes', 'notes'],
 ];
 
@@ -675,6 +688,7 @@ function openGameModal(game = null, prefill = {}) {
       if (el) el.value = game[key] ?? '';
     }
     modal.$('#f-favorite').checked = Boolean(game.favorite);
+    modal.$('#f-has_iso').checked = Boolean(game.has_iso);
     for (const part of PARTS) {
       modal.$(`#f-${part.key}`).checked = Boolean(game[part.key]);
     }
@@ -698,9 +712,11 @@ function openGameModal(game = null, prefill = {}) {
       }
     });
   } else {
-    // Cataloguer une etagere, c'est enchainer des jeux de la meme plateforme
-    // et souvent du meme etat : on repart des dernieres valeurs saisies.
+    // Cataloguer une etagere, c'est enchainer des jeux de la meme plateforme,
+    // de la meme region et souvent du meme etat : on repart des dernieres
+    // valeurs saisies.
     modal.$('#f-platform').value = store.get('gameshelf-last-platform') || '';
+    modal.$('#f-region').value = store.get('gameshelf-last-region') || '';
     modal.$('#f-condition').value = store.get('gameshelf-last-condition') || '';
 
     for (const [key, value] of Object.entries(prefill)) {
@@ -760,7 +776,10 @@ function openGameModal(game = null, prefill = {}) {
 
   // Enregistrement
   async function save({ keepOpen = false } = {}) {
-    const payload = { favorite: modal.$('#f-favorite').checked ? 1 : 0 };
+    const payload = {
+      favorite: modal.$('#f-favorite').checked ? 1 : 0,
+      has_iso: modal.$('#f-has_iso').checked ? 1 : 0,
+    };
     for (const [id, key] of FORM_FIELDS) {
       const el = modal.$(`#${id}`);
       if (el) payload[key] = el.value.trim();
@@ -784,15 +803,17 @@ function openGameModal(game = null, prefill = {}) {
 
       // Memorise le contexte de saisie pour la fiche suivante.
       store.set('gameshelf-last-platform', payload.platform);
+      store.set('gameshelf-last-region', payload.region);
       store.set('gameshelf-last-condition', payload.condition);
 
       if (keepOpen) {
         // On ne vide que ce qui change d'un jeu a l'autre.
-        for (const id of ['f-title', 'f-ean', 'f-cover', 'f-tags', 'f-notes']) {
+        for (const id of ['f-title', 'f-serial', 'f-ean', 'f-cover', 'f-tags', 'f-notes']) {
           modal.$(`#${id}`).value = '';
         }
         modal.$('#f-quantity').value = '1';
         modal.$('#f-favorite').checked = false;
+        modal.$('#f-has_iso').checked = false;
         for (const part of PARTS) modal.$(`#f-${part.key}`).checked = true;
         updatePreview();
         modal.$('#lookup-results').innerHTML = '';
@@ -928,7 +949,12 @@ function openIoModal() {
     try {
       const content = await file.text();
       const format = /\.json$/i.test(file.name) ? 'json' : 'csv';
-      const result = await api.importData(content, format, mode);
+      const result = await api.importData(
+        content,
+        format,
+        mode,
+        modal.$('#import-platform').value.trim(),
+      );
 
       const details = result.details?.length
         ? `<details style="margin-top:8px"><summary style="cursor:pointer">Voir les lignes ignorées</summary>
@@ -986,6 +1012,7 @@ function bindEvents() {
       resetFilters();
       if (quick.dataset.quick === 'favorite') state.filters.favorite = '1';
       if (quick.dataset.quick === 'incomplete') state.filters.incomplete = '1';
+      if (quick.dataset.quick === 'noiso') state.filters.iso = '0';
       document.body.classList.remove('sidebar-open');
       refresh();
       return;

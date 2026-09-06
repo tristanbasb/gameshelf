@@ -20,6 +20,12 @@ const migrations = [
         title         TEXT    NOT NULL,
         platform      TEXT    NOT NULL DEFAULT '',
 
+        -- Zone de commercialisation : PAL, NTSC-U, NTSC-J...
+        region        TEXT    NOT NULL DEFAULT '',
+
+        -- Reference editeur imprimee sur le disque (SLES52237, SCES51910/P...)
+        serial        TEXT    NOT NULL DEFAULT '',
+
         -- Code-barres du boitier, utilise pour le scan depuis un telephone.
         ean           TEXT    NOT NULL DEFAULT '',
 
@@ -31,6 +37,10 @@ const migrations = [
         has_cover_art INTEGER NOT NULL DEFAULT 1,
         has_manual    INTEGER NOT NULL DEFAULT 1,
         has_disc      INTEGER NOT NULL DEFAULT 1,
+
+        -- Sauvegarde numerique du disque. Independant de la completude :
+        -- un jeu sans ISO n'est pas un exemplaire incomplet.
+        has_iso       INTEGER NOT NULL DEFAULT 0,
 
         favorite      INTEGER NOT NULL DEFAULT 0,
         cover_url     TEXT    NOT NULL DEFAULT '',
@@ -44,6 +54,7 @@ const migrations = [
       CREATE INDEX idx_games_platform  ON games(platform);
       CREATE INDEX idx_games_condition ON games(condition);
       CREATE INDEX idx_games_ean       ON games(ean);
+      CREATE INDEX idx_games_serial    ON games(serial);
     `);
   },
 ];

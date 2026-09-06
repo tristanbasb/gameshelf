@@ -14,8 +14,8 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 
 ## Ce que fait l'application
 
-- **Fiche par jeu** : titre, plateforme, code-barres, quantité, état,
-  complétude, tags, visuel, notes libres, favori.
+- **Fiche par jeu** : titre, plateforme, région, serial éditeur, code-barres,
+  quantité, état, complétude, ISO, tags, visuel, notes libres, favori.
 - **Scan de code-barres** : ouvrez la caméra du téléphone, visez le dos du
   boîtier, et l'application répond immédiatement — soit « ✓ vous l'avez déjà »
   avec la quantité, l'état et les pièces manquantes, soit une proposition
@@ -25,8 +25,8 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
   qui est amputé d'une pièce.
 - **Recherche instantanée** sur le titre, la plateforme, les tags, les notes
   et le code-barres.
-- **Filtres** par état, plateforme, tag, favoris et incomplets —
-  combinables, et reflétés dans l'URL.
+- **Filtres** par état, plateforme, région, tag, favoris, incomplets et
+  « sans ISO » — combinables, et reflétés dans l'URL.
 - **Saisie en chaîne** : le bouton **Enregistrer et suivant** garde la fiche
   ouverte, conserve la plateforme et l'état, vide le reste et replace le
   curseur sur le titre. Cataloguer une étagère revient à enchaîner
@@ -175,25 +175,45 @@ locale. Voir [`.env.example`](.env.example).
 Bouton **Import / export** dans l'en-tête. Le fichier peut être un CSV
 (séparateur `,`, `;` ou tabulation, détecté automatiquement) ou un JSON.
 
-La première ligne du CSV donne les en-têtes. Les noms français courants sont
-reconnus :
+La première ligne du CSV donne les en-têtes. Le format d'un inventaire tenu à
+la main est reconnu tel quel :
 
 ```csv
-titre,plateforme,ean,quantité,état,boîte,jaquette,notice,disque,tags,notes
-Chrono Trigger,Super Nintendo,3307210001003,1,comme neuf,oui,oui,oui,oui,collector,Rangé étagère 2
-Tetris,Game Boy,3307210001004,4,correct,non,non,non,oui,,Trois cartouches nues
+Titre,Région,État,Serial,EAN,Complet,ISO,Notes
+.hack // INFECTION,PAL,Très bon,SLES52237,3546430109915,Oui,Oui,-
+.hack // MUTATION,PAL,Très bon,SLES52467,3546430111451,"CD, Boîte",Oui,-
+Call of Duty Le Jour De Gloire,PAL,Acceptable,SLES52783,-,Oui,Oui,-
 ```
 
 Conversions automatiques :
 
-- **État** : `neuf`, `sous blister`, `comme neuf`, `TBE`, `bon état`,
-  `correct`, `abîmé`…
-- **Complétude** : une colonne vide vaut « présent » ; écrivez `non`,
-  `manquant` ou `absent` pour signaler une pièce manquante.
+- **En-têtes** : `titre`, `plateforme`, `région`, `état`, `serial`, `ean`,
+  `quantité`, `complet`, `iso`, `favori`, `tags`, `notes` — avec ou sans
+  accents, ainsi que leurs synonymes courants (`console`, `zone`,
+  `code-barres`, `référence`, `dump`…).
+- **État** : `Neuf`, `Très bon`, `Bon`, `Acceptable`, `Mauvais`, et les
+  variantes usuelles (`TBE`, `sous blister`, `abîmé`…).
+- **Complet** : `Oui`, `Non`, ou la liste de ce qui est présent —
+  `CD, Boîte` signifie donc « sans notice ». Les colonnes séparées
+  (`boîte`, `notice`, `disque`) restent acceptées et priment sur cette liste.
+- **Tiret seul** : `-` vaut case vide, dans n'importe quelle colonne.
+- **Séparateur** : virgule, point-virgule ou tabulation, détecté tout seul.
 
-Deux modes : **Ajouter** (les doublons titre + plateforme sont ignorés) ou
-**Remplacer** (la collection est effacée avant l'import). Les lignes invalides
-sont signalées, l'import se poursuit pour les autres.
+> La jaquette n'est comptée comme manquante que si le fichier la nomme
+> explicitement. La plupart des inventaires ne la distinguent pas de la boîte,
+> et la déclarer absente partout fausserait la collection.
+
+Deux réglages complètent l'import :
+
+- **Plateforme par défaut** — pour un fichier ne couvrant qu'une console, qui
+  n'a donc pas de colonne « plateforme ».
+- **Mode** : *Ajouter* (les doublons titre + plateforme sont ignorés) ou
+  *Remplacer* (la collection est effacée avant l'import).
+
+Les lignes invalides sont signalées, l'import se poursuit pour les autres.
+
+L'**export CSV** reprend exactement ces colonnes : un aller-retour
+export → import restitue la collection à l'identique.
 
 ---
 
@@ -255,9 +275,11 @@ sauvegarde, pages statiques) et supprime les données de test qu'il a créées.
 | `POST` | `/api/upload` | Téléversement d'une image (`multipart`, champ `cover`) |
 | `GET` | `/api/external/search?q=` | Recherche RAWG (si clé configurée) |
 
-Paramètres de `GET /api/games` : `search`, `ean`, `platform`, `condition`,
-`tag`, `favorite=1`, `incomplete=1`, `sort`, `dir`, `page`,
-`limit` (`limit=all` renvoie toute la collection).
+Paramètres de `GET /api/games` : `search`, `ean`, `serial`, `platform`,
+`region`, `condition`, `tag`, `favorite=1`, `incomplete=1`, `iso=0|1`,
+`sort`, `dir`, `page`, `limit` (`limit=all` renvoie toute la collection).
+
+`POST /api/import` accepte `{content, format, mode, defaultPlatform}`.
 
 ---
 

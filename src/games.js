@@ -91,9 +91,12 @@ export function normalizeGame(input = {}) {
   const row = {
     title,
     platform: str(input.platform),
+    region: str(input.region, 20),
+    serial: str(input.serial, 40),
     ean: normalizeEan(input.ean),
     quantity: quantity ?? 1,
     condition,
+    has_iso: flag(input.has_iso, 0),
     favorite: flag(input.favorite, 0),
     cover_url: normalizeCoverUrl(input.cover_url),
     notes: str(input.notes, MAX_NOTES),
@@ -109,13 +112,15 @@ export function normalizeGame(input = {}) {
 }
 
 const COLUMNS = [
-  'title', 'platform', 'ean', 'quantity', 'condition', ...PARTS,
-  'favorite', 'cover_url', 'notes', 'tags',
+  'title', 'platform', 'region', 'serial', 'ean', 'quantity', 'condition',
+  ...PARTS, 'has_iso', 'favorite', 'cover_url', 'notes', 'tags',
 ];
 
 const SORTABLE = {
   title: 'title COLLATE NOCASE',
   platform: 'platform COLLATE NOCASE',
+  region: 'region COLLATE NOCASE',
+  serial: 'serial COLLATE NOCASE',
   quantity: 'quantity',
   created_at: 'created_at',
   updated_at: 'updated_at',
@@ -130,8 +135,9 @@ export function listGames(query = {}) {
 
   if (query.search) {
     where.push(
-      '(title LIKE @search OR platform LIKE @search'
-      + ' OR tags LIKE @search OR notes LIKE @search OR ean LIKE @search)',
+      '(title LIKE @search OR platform LIKE @search OR region LIKE @search'
+      + ' OR serial LIKE @search OR tags LIKE @search OR notes LIKE @search'
+      + ' OR ean LIKE @search)',
     );
     params.search = `%${String(query.search).trim()}%`;
   }
@@ -146,6 +152,17 @@ export function listGames(query = {}) {
   if (query.condition) {
     where.push('condition = @condition');
     params.condition = String(query.condition);
+  }
+  if (query.region) {
+    where.push('region = @region');
+    params.region = String(query.region);
+  }
+  if (query.serial) {
+    where.push('serial = @serial');
+    params.serial = String(query.serial);
+  }
+  if (query.iso === '0' || query.iso === '1') {
+    where.push(`has_iso = ${query.iso === '1' ? 1 : 0}`);
   }
   if (query.favorite === '1' || query.favorite === true) {
     where.push('favorite = 1');
@@ -276,6 +293,7 @@ export function getMeta() {
       `SELECT COUNT(*) AS total,
               COALESCE(SUM(quantity), 0) AS copies,
               SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END) AS favorites,
+              SUM(CASE WHEN has_iso = 0 THEN 1 ELSE 0 END) AS without_iso,
               SUM(CASE WHEN ${INCOMPLETE_SQL} THEN 1 ELSE 0 END) AS incomplete
          FROM games`,
     )
@@ -283,6 +301,7 @@ export function getMeta() {
 
   return {
     platforms: distinct('platform'),
+    regions: distinct('region'),
     tags: [...tagCounts.entries()]
       .map(([value, count]) => ({ value, count }))
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
@@ -293,6 +312,7 @@ export function getMeta() {
       copies: totals.copies,
       favorites: totals.favorites || 0,
       incomplete: totals.incomplete || 0,
+      without_iso: totals.without_iso || 0,
     },
   };
 }

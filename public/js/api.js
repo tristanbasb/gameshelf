@@ -69,8 +69,8 @@ export const api = {
     return request('/api/upload', { method: 'POST', body: form });
   },
 
-  importData: (content, format, mode) =>
-    withBody('POST')('/api/import', { content, format, mode }),
+  importData: (content, format, mode, defaultPlatform) =>
+    withBody('POST')('/api/import', { content, format, mode, defaultPlatform }),
 
   searchExternal: (q) => request(`/api/external/search?q=${encodeURIComponent(q)}`),
   externalGame: (id) => request(`/api/external/game/${id}`),

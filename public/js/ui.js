@@ -35,22 +35,27 @@ export const esc = (value) =>
 /* Libelles metier                                                            */
 /* -------------------------------------------------------------------------- */
 
+/*
+ * Echelle d'etat, du meilleur au plus abime. Les libelles reprennent le
+ * vocabulaire courant des inventaires de collection (Tres bon, Bon,
+ * Acceptable, Mauvais), ce qui rend les imports lisibles sans traduction.
+ */
 export const CONDITION_LABELS = {
   sealed: 'Neuf, sous blister',
-  mint: 'Comme neuf',
-  good: 'Bon état',
-  fair: 'État correct',
-  poor: 'Abîmé',
+  mint: 'Très bon',
+  good: 'Bon',
+  fair: 'Acceptable',
+  poor: 'Mauvais',
   '': 'État non renseigné',
 };
 
 /** Version courte, pour les badges des cartes et du tableau. */
 export const CONDITION_SHORT = {
   sealed: 'Neuf',
-  mint: 'Comme neuf',
-  good: 'Bon état',
-  fair: 'Correct',
-  poor: 'Abîmé',
+  mint: 'Très bon',
+  good: 'Bon',
+  fair: 'Acceptable',
+  poor: 'Mauvais',
   '': '—',
 };
 

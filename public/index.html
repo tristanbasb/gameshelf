@@ -74,6 +74,10 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
           Incomplets <span class="count" id="count-incomplete"></span>
         </button>
+        <button class="filter-item" data-quick="noiso">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>
+          Sans ISO <span class="count" id="count-noiso"></span>
+        </button>
       </div>
     </div>
 
@@ -85,6 +89,11 @@
     <div class="filter-group">
       <h3>Plateforme</h3>
       <div class="filter-list" id="filter-platform"></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Région</h3>
+      <div class="filter-list" id="filter-region"></div>
     </div>
 
     <div class="filter-group">
@@ -212,6 +221,22 @@
             </div>
 
             <div class="field">
+              <label for="f-region">Région</label>
+              <input class="input" id="f-region" name="region" list="dl-regions" autocomplete="off" placeholder="PAL, NTSC-U, NTSC-J…">
+              <datalist id="dl-regions">
+                <option value="PAL"></option>
+                <option value="NTSC-U"></option>
+                <option value="NTSC-J"></option>
+                <option value="NTSC"></option>
+              </datalist>
+            </div>
+
+            <div class="field">
+              <label for="f-serial">Serial</label>
+              <input class="input" id="f-serial" name="serial" autocomplete="off" placeholder="SLES52237, SCES51910/P…">
+            </div>
+
+            <div class="field">
               <label for="f-ean">Code-barres (EAN)</label>
               <div style="display:flex; gap:8px">
                 <input class="input" id="f-ean" name="ean" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="8 à 14 chiffres">
@@ -230,11 +255,11 @@
               <label for="f-condition">État</label>
               <select class="select" id="f-condition" name="condition">
                 <option value="">Non renseigné</option>
-                <option value="sealed">Neuf, sous blister</option>
-                <option value="mint">Comme neuf</option>
-                <option value="good">Bon état</option>
-                <option value="fair">État correct</option>
-                <option value="poor">Abîmé</option>
+                <option value="sealed">Neuf</option>
+                <option value="mint">Très bon</option>
+                <option value="good">Bon</option>
+                <option value="fair">Acceptable</option>
+                <option value="poor">Mauvais</option>
               </select>
             </div>
 
@@ -250,10 +275,10 @@
             </div>
 
             <div class="field full">
-              <label class="switch">
-                <input type="checkbox" id="f-favorite" name="favorite">
-                <span>Marquer comme favori</span>
-              </label>
+              <div class="parts-grid">
+                <label class="switch"><input type="checkbox" id="f-has_iso"><span>J'ai l'ISO</span></label>
+                <label class="switch"><input type="checkbox" id="f-favorite" name="favorite"><span>Favori</span></label>
+              </div>
             </div>
 
             <div class="field full">
@@ -316,11 +341,19 @@
 
         <h3 style="font-size:14px; margin-bottom:10px">Importer</h3>
         <p style="color:var(--text-muted); font-size:13px; margin:0 0 12px">
-          Fichier CSV ou JSON. La première ligne d'un CSV donne les en-têtes :
-          <code>titre, plateforme, ean, quantité, état, boîte, jaquette, notice, disque, tags, notes</code>
-          sont reconnus. Pour la complétude, écrivez <code>non</code> ou <code>manquant</code>
-          dans la colonne correspondante.
+          Fichier CSV ou JSON. La première ligne d'un CSV donne les en-têtes.
+          Sont reconnus : <code>titre, plateforme, région, état, serial, ean,
+          quantité, complet, iso, favori, tags, notes</code>.
+          La colonne <code>complet</code> accepte <code>Oui</code>, <code>Non</code>
+          ou la liste de ce qui est présent (<code>CD, Boîte</code>).
         </p>
+
+        <div class="field" style="margin-bottom:12px">
+          <label for="import-platform">Plateforme par défaut</label>
+          <input class="input" id="import-platform" list="dl-platforms" autocomplete="off"
+                 placeholder="ex. PlayStation 2 — pour un fichier d'une seule console">
+          <span class="hint">Utilisée pour les lignes sans colonne « plateforme ».</span>
+        </div>
 
         <div class="field" style="margin-bottom:12px">
           <label for="import-mode">Mode</label>
