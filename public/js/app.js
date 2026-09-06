@@ -1,8 +1,8 @@
 import { api } from './api.js';
 import {
-  $, $$, esc, toast, openModal, confirmDialog, debounce, initial,
-  CONDITION_LABELS, CONDITION_SHORT, CONDITION_COLORS, FORMAT_LABELS, store,
-  fmtNumber, fmtMoney, fmtDate,
+  $, $$, esc, toast, openModal, confirmDialog, debounce, initial, store,
+  CONDITION_LABELS, CONDITION_SHORT, CONDITION_COLORS, FORMAT_LABELS,
+  PARTS, missingParts, fmtNumber, fmtDate,
 } from './ui.js';
 
 /* ==========================================================================
@@ -13,15 +13,16 @@ const CONDITIONS = ['sealed', 'mint', 'good', 'fair', 'poor'];
 const FORMATS = ['physical', 'digital'];
 
 const state = {
-  filters: { search: '', platform: '', condition: '', format: '', tag: '', favorite: '' },
+  filters: {
+    search: '', platform: '', condition: '', format: '',
+    tag: '', favorite: '', incomplete: '',
+  },
   sort: 'created_at',
   dir: 'desc',
   page: 1,
-  limit: 60,
+  limit: store.get('gameshelf-limit') || '60',
   view: store.get('gameshelf-view') || 'grid',
-  screen: 'collection',
   meta: null,
-  counts: { conditions: [], formats: [] },
   session: { externalSearch: false, user: null, authDisabled: false },
 };
 
@@ -37,7 +38,7 @@ function readUrl() {
   state.sort = params.get('sort') || 'created_at';
   state.dir = params.get('dir') || 'desc';
   state.page = Math.max(Number.parseInt(params.get('page'), 10) || 1, 1);
-  state.screen = params.get('screen') === 'stats' ? 'stats' : 'collection';
+  if (params.get('limit')) state.limit = params.get('limit');
 }
 
 function writeUrl() {
@@ -48,7 +49,7 @@ function writeUrl() {
   if (state.sort !== 'created_at') params.set('sort', state.sort);
   if (state.dir !== 'desc') params.set('dir', state.dir);
   if (state.page > 1) params.set('page', String(state.page));
-  if (state.screen === 'stats') params.set('screen', 'stats');
+  if (state.limit !== '60') params.set('limit', state.limit);
 
   const query = params.toString();
   try {
@@ -87,7 +88,7 @@ function renderSidebar() {
 
   // Etat des exemplaires : ordre fixe, plus une entree "non renseigne"
   // uniquement si des jeux sont concernes.
-  const conditionCounts = new Map(state.counts.conditions.map((row) => [row.label, row.count]));
+  const conditionCounts = new Map((meta.by_condition || []).map((r) => [r.label, r.count]));
   const conditionKeys = [...CONDITIONS];
   if ((conditionCounts.get('') || 0) > 0) conditionKeys.push('');
 
@@ -103,7 +104,7 @@ function renderSidebar() {
     ),
   );
 
-  const formatCounts = new Map(state.counts.formats.map((row) => [row.label, row.count]));
+  const formatCounts = new Map((meta.by_format || []).map((r) => [r.label, r.count]));
   $('#filter-format').replaceChildren(
     ...FORMATS.map((key) =>
       filterButton({
@@ -145,11 +146,20 @@ function renderSidebar() {
   fillDatalist('dl-platforms', meta.platforms);
   fillDatalist('dl-developers', meta.developers);
 
-  // Etat actif des raccourcis "Tous" / "Favoris".
+  // Compteurs et etat actif des vues rapides.
+  const totals = meta.totals || {};
+  $('#count-all').textContent = fmtNumber(totals.total || 0);
+  $('#count-fav').textContent = fmtNumber(totals.favorites || 0);
+  $('#count-incomplete').textContent = fmtNumber(totals.incomplete || 0);
+
   const noFilter = !Object.values(state.filters).some(Boolean);
   $$('[data-quick]').forEach((btn) => {
-    const isFav = btn.dataset.quick === 'favorite';
-    btn.classList.toggle('active', isFav ? state.filters.favorite === '1' : noFilter);
+    const quick = btn.dataset.quick;
+    const active =
+      quick === 'favorite' ? state.filters.favorite === '1'
+        : quick === 'incomplete' ? state.filters.incomplete === '1'
+          : noFilter;
+    btn.classList.toggle('active', active);
   });
 }
 
@@ -164,6 +174,7 @@ const CHIP_LABELS = {
   format: 'Format',
   tag: 'Tag',
   favorite: 'Favoris',
+  incomplete: 'Incomplets',
 };
 
 function renderChips() {
@@ -178,7 +189,7 @@ function renderChips() {
   const shownValue = (key, value) => {
     if (key === 'condition') return CONDITION_LABELS[value] || value;
     if (key === 'format') return FORMAT_LABELS[value] || value;
-    if (key === 'favorite') return 'oui';
+    if (key === 'favorite' || key === 'incomplete') return 'oui';
     return value;
   };
 
@@ -209,7 +220,7 @@ function renderChips() {
    ========================================================================== */
 
 /**
- * Jaquette d'une carte. Les images cassees sont remplacees par l'initiale du
+ * Visuel d'une carte. Les images cassees sont remplacees par l'initiale du
  * titre : l'evenement `error` est capture au niveau du conteneur (voir
  * bindEvents), car un handler inline serait bloque par la CSP.
  */
@@ -218,6 +229,14 @@ function coverMarkup(game) {
     return `<img src="${esc(game.cover_url)}" alt="" loading="lazy" data-initial="${esc(initial(game.title))}">`;
   }
   return `<div class="cover-placeholder">${esc(initial(game.title))}</div>`;
+}
+
+function missingBadge(game) {
+  const missing = missingParts(game);
+  if (missing.length === 0) return '';
+  return `<span class="missing" title="Éléments manquants : ${esc(missing.join(', '))}">
+    sans ${esc(missing.join(', '))}
+  </span>`;
 }
 
 function gameCard(game) {
@@ -229,6 +248,7 @@ function gameCard(game) {
   card.setAttribute('aria-label', `Modifier ${game.title}`);
 
   const meta = [game.platform, game.release_year].filter(Boolean).map(esc).join(' · ');
+  const missing = missingBadge(game);
 
   card.innerHTML = `
     <div class="cover">
@@ -246,6 +266,7 @@ function gameCard(game) {
     <div class="card-body">
       <div class="card-title">${esc(game.title)}</div>
       ${meta ? `<div class="card-meta">${meta}</div>` : ''}
+      ${missing ? `<div class="card-meta">${missing}</div>` : ''}
       <div class="card-foot">
         <span class="badge">
           <span class="dot" style="background:${CONDITION_COLORS[game.condition] || 'var(--text-faint)'}"></span>
@@ -263,9 +284,10 @@ const TABLE_COLUMNS = [
   { key: 'quantity', label: 'Qté' },
   { key: null, label: 'État' },
   { key: null, label: 'Format' },
+  { key: null, label: 'Manque' },
   { key: 'release_year', label: 'Année' },
   { key: 'rating', label: 'Note' },
-  { key: 'price', label: 'Prix' },
+  { key: null, label: 'Code-barres' },
   { key: 'created_at', label: 'Ajouté le' },
 ];
 
@@ -280,8 +302,9 @@ function renderTable(items) {
   }).join('');
 
   const body = items
-    .map(
-      (game) => `
+    .map((game) => {
+      const missing = missingParts(game);
+      return `
       <tr data-id="${game.id}">
         <td class="title-cell">
           <span class="cell-flex">
@@ -300,12 +323,13 @@ function renderTable(items) {
           </span>
         </td>
         <td>${esc(FORMAT_LABELS[game.format] || game.format)}</td>
+        <td>${missing.length ? `<span class="missing">${esc(missing.join(', '))}</span>` : '—'}</td>
         <td>${game.release_year ?? '—'}</td>
         <td>${game.rating ?? '—'}</td>
-        <td>${game.price !== null && game.price !== undefined ? esc(fmtMoney(game.price)) : '—'}</td>
+        <td style="font-variant-numeric:tabular-nums">${esc(game.ean) || '—'}</td>
         <td>${esc(fmtDate(game.created_at))}</td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join('');
 
   wrap.innerHTML = `<table class="games"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
@@ -422,12 +446,7 @@ async function loadGames() {
 }
 
 async function loadMeta() {
-  const [meta, stats] = await Promise.all([api.meta(), api.stats()]);
-  state.meta = meta;
-  state.counts.conditions = stats.by_condition;
-  state.counts.formats = stats.by_format;
-  $('#count-all').textContent = fmtNumber(stats.total);
-  $('#count-fav').textContent = fmtNumber(stats.favorites || 0);
+  state.meta = await api.meta();
   renderSidebar();
 }
 
@@ -446,18 +465,180 @@ async function refresh({ withMeta = false } = {}) {
 }
 
 /* ==========================================================================
+   Scanner de codes-barres
+   ========================================================================== */
+
+const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'itf'];
+
+/**
+ * Ouvre la modale de scan. `onDetect(code)` recoit le code lu ; s'il renvoie
+ * true, la modale se ferme. Sans callback, on interroge la collection.
+ */
+async function openScanModal({ onDetect } = {}) {
+  let stopped = false;
+  let stream = null;
+
+  const stopCamera = () => {
+    stopped = true;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+  };
+
+  const modal = openModal('tpl-scan-modal', { onClose: stopCamera });
+  const video = modal.$('#scanner-video');
+  const status = modal.$('#scanner-status');
+  const result = modal.$('#scan-result');
+
+  const handle = async (code) => {
+    if (onDetect) {
+      if (onDetect(code) !== false) modal.close();
+      return;
+    }
+    await showLookup(code, modal, result, status);
+  };
+
+  modal.$('#btn-scan-manual').addEventListener('click', () => {
+    const code = modal.$('#scan-manual').value.trim();
+    if (!code) {
+      toast('Saisissez un code-barres', 'error');
+      return;
+    }
+    handle(code);
+  });
+  modal.$('#scan-manual').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      modal.$('#btn-scan-manual').click();
+    }
+  });
+
+  // --- Disponibilite de la camera -------------------------------------------
+  if (!window.isSecureContext) {
+    status.textContent =
+      'La caméra exige une connexion HTTPS (ou localhost). Saisissez le code à la main.';
+    modal.$('#scanner-frame').hidden = true;
+    modal.$('#scan-manual').focus();
+    return;
+  }
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
+    status.textContent =
+      'Ce navigateur ne sait pas lire les codes-barres (Chrome sur Android, oui). Saisissez le code à la main.';
+    modal.$('#scanner-frame').hidden = true;
+    modal.$('#scan-manual').focus();
+    return;
+  }
+
+  try {
+    const supported = await window.BarcodeDetector.getSupportedFormats();
+    const formats = BARCODE_FORMATS.filter((f) => supported.includes(f));
+    const detector = new window.BarcodeDetector(formats.length ? { formats } : undefined);
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+    });
+    if (stopped) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    video.srcObject = stream;
+    await video.play();
+    status.textContent = 'Visez le code-barres au dos du boîtier.';
+
+    let lastCode = '';
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const codes = await detector.detect(video);
+        const code = codes[0]?.rawValue;
+        if (code && code !== lastCode) {
+          lastCode = code;
+          navigator.vibrate?.(60);
+          status.textContent = `Code lu : ${code}`;
+          modal.$('#scan-manual').value = code;
+          await handle(code);
+        }
+      } catch {
+        /* image illisible sur cette frame : on retente */
+      }
+      if (!stopped) setTimeout(tick, 250);
+    };
+    tick();
+  } catch (err) {
+    modal.$('#scanner-frame').hidden = true;
+    status.textContent =
+      err?.name === 'NotAllowedError'
+        ? "Accès à la caméra refusé. Autorisez-le, ou saisissez le code à la main."
+        : `Caméra indisponible : ${err.message}. Saisissez le code à la main.`;
+    modal.$('#scan-manual').focus();
+  }
+}
+
+/** Affiche le resultat d'une recherche par code-barres. */
+async function showLookup(code, modal, result, status) {
+  result.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Recherche…</p>';
+  try {
+    const data = await api.lookup(code);
+
+    if (!data.found) {
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'scan-hit miss';
+      add.innerHTML = `
+        <span style="min-width:0">
+          <span class="h-title">Pas dans votre collection</span><br>
+          <span class="h-meta">Code ${esc(data.ean)} — cliquez pour l'ajouter</span>
+        </span>`;
+      add.addEventListener('click', () => {
+        modal.close();
+        openGameModal(null, { ean: data.ean });
+      });
+      result.replaceChildren(add);
+      status.textContent = 'Aucune correspondance.';
+      return;
+    }
+
+    status.textContent = `${data.games.length} correspondance(s).`;
+    result.replaceChildren(
+      ...data.games.map((game) => {
+        const missing = missingParts(game);
+        const hit = document.createElement('button');
+        hit.type = 'button';
+        hit.className = 'scan-hit';
+        hit.innerHTML = `
+          <span style="min-width:0">
+            <span class="h-title">✓ Vous l'avez déjà : ${esc(game.title)}</span><br>
+            <span class="h-meta">${[
+              esc(game.platform),
+              `${game.quantity} exemplaire${game.quantity > 1 ? 's' : ''}`,
+              esc(CONDITION_SHORT[game.condition] ?? ''),
+              missing.length ? `sans ${esc(missing.join(', '))}` : '',
+            ].filter(Boolean).join(' · ')}</span>
+          </span>`;
+        hit.addEventListener('click', () => {
+          modal.close();
+          openGame(game.id);
+        });
+        return hit;
+      }),
+    );
+  } catch (err) {
+    result.innerHTML = `<div class="form-error">${esc(err.message)}</div>`;
+  }
+}
+
+/* ==========================================================================
    Modale : fiche de jeu
    ========================================================================== */
 
 const FORM_FIELDS = [
   ['f-title', 'title'], ['f-cover', 'cover_url'], ['f-platform', 'platform'],
-  ['f-quantity', 'quantity'], ['f-condition', 'condition'], ['f-format', 'format'],
-  ['f-developer', 'developer'], ['f-publisher', 'publisher'], ['f-year', 'release_year'],
-  ['f-rating', 'rating'], ['f-price', 'price'], ['f-purchase', 'purchase_date'],
+  ['f-ean', 'ean'], ['f-quantity', 'quantity'], ['f-condition', 'condition'],
+  ['f-format', 'format'], ['f-developer', 'developer'], ['f-publisher', 'publisher'],
+  ['f-year', 'release_year'], ['f-rating', 'rating'], ['f-purchase', 'purchase_date'],
   ['f-tags', 'tags'], ['f-notes', 'notes'],
 ];
 
-function openGameModal(game = null) {
+function openGameModal(game = null, prefill = {}) {
   const modal = openModal('tpl-game-modal');
   const isEdit = Boolean(game);
 
@@ -466,12 +647,22 @@ function openGameModal(game = null) {
   const coverInput = modal.$('#f-cover');
   const updatePreview = () => updateCoverPreview(modal);
 
+  // Les elements de completude n'ont pas de sens pour un jeu dematerialise.
+  const formatSelect = modal.$('#f-format');
+  const syncPartsVisibility = () => {
+    modal.$('#parts-block').hidden = formatSelect.value === 'digital';
+  };
+  formatSelect.addEventListener('change', syncPartsVisibility);
+
   if (isEdit) {
     for (const [id, key] of FORM_FIELDS) {
       const el = modal.$(`#${id}`);
       if (el) el.value = game[key] ?? '';
     }
     modal.$('#f-favorite').checked = Boolean(game.favorite);
+    for (const part of PARTS) {
+      modal.$(`#f-${part.key}`).checked = Boolean(game[part.key]);
+    }
     updatePreview();
 
     const deleteButton = modal.$('#btn-delete');
@@ -491,7 +682,15 @@ function openGameModal(game = null) {
         toast(err.message, 'error');
       }
     });
+  } else {
+    for (const [key, value] of Object.entries(prefill)) {
+      const el = modal.$(`#f-${key}`);
+      if (el) el.value = value;
+    }
+    if (prefill.ean) modal.$('#f-title').focus();
   }
+
+  syncPartsVisibility();
 
   coverInput.addEventListener('input', debounce(updatePreview, 400));
   modal.$('#btn-clear-cover').addEventListener('click', () => {
@@ -499,7 +698,18 @@ function openGameModal(game = null) {
     updatePreview();
   });
 
-  // Televersement d'une jaquette
+  // Scan du code-barres depuis le formulaire
+  modal.$('#btn-scan-field').addEventListener('click', () => {
+    openScanModal({
+      onDetect: (code) => {
+        modal.$('#f-ean').value = code.replace(/[\s-]/g, '');
+        toast(`Code-barres : ${code}`);
+        return true;
+      },
+    });
+  });
+
+  // Televersement d'un visuel
   const fileInput = modal.$('#file-cover');
   modal.$('#btn-upload').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {
@@ -512,7 +722,7 @@ function openGameModal(game = null) {
       const { url } = await api.uploadCover(file);
       coverInput.value = url;
       updatePreview();
-      toast('Jaquette téléversée');
+      toast('Image téléversée');
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -536,6 +746,9 @@ function openGameModal(game = null) {
     for (const [id, key] of FORM_FIELDS) {
       const el = modal.$(`#${id}`);
       if (el) payload[key] = el.value.trim();
+    }
+    for (const part of PARTS) {
+      payload[part.key] = modal.$(`#f-${part.key}`).checked ? 1 : 0;
     }
     if (!payload.title) {
       toast('Le titre est obligatoire', 'error');
@@ -625,7 +838,7 @@ async function runLookup(modal) {
   }
 }
 
-/** Affiche la jaquette courante du formulaire dans l'encadre d'apercu. */
+/** Affiche le visuel courant du formulaire dans l'encadre d'apercu. */
 function updateCoverPreview(modal) {
   const url = modal.$('#f-cover').value.trim();
   const preview = modal.$('#cover-preview');
@@ -729,129 +942,6 @@ function openAccountModal() {
 }
 
 /* ==========================================================================
-   Statistiques
-   ========================================================================== */
-
-function barList(rows, total) {
-  if (!rows.length) return '<p style="color:var(--text-faint);font-size:13px">Aucune donnée</p>';
-  const max = Math.max(...rows.map((r) => r.count), 1);
-  return rows
-    .map(
-      (row) => `
-      <div class="bar-row">
-        <div class="bar-label">
-          <span class="name">${esc(row.label)}</span>
-          <span class="n">${fmtNumber(row.count)}${total ? ` · ${Math.round((row.count / total) * 100)}%` : ''}</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(row.count / max) * 100}%"></div></div>
-      </div>`,
-    )
-    .join('');
-}
-
-async function renderStats() {
-  const box = $('#stats-content');
-  box.innerHTML = '<div class="skeleton" style="height:120px;aspect-ratio:auto"></div>';
-
-  try {
-    const stats = await api.stats();
-
-    const cards = [
-      { label: 'Titres différents', value: fmtNumber(stats.total), sub: 'jeux distincts' },
-      { label: 'Exemplaires', value: fmtNumber(stats.copies), sub: `dont ${fmtNumber(stats.duplicates || 0)} titre(s) en plusieurs exemplaires` },
-      { label: 'Plateformes', value: fmtNumber(stats.platform_count || 0), sub: 'supports représentés' },
-      { label: 'Valeur d’achat', value: fmtMoney(stats.total_spent), sub: 'somme des prix renseignés' },
-      { label: 'Favoris', value: fmtNumber(stats.favorites || 0), sub: 'jeux marqués' },
-      {
-        label: 'Note moyenne',
-        value: stats.rated_count
-          ? `${(Math.round(stats.avg_rating * 10) / 10).toString().replace('.', ',')}/10`
-          : '—',
-        sub: `${fmtNumber(stats.rated_count)} jeu(x) noté(s)`,
-      },
-    ];
-
-    const label = (dict, key) => dict[key] ?? key;
-    const conditionRows = (stats.by_condition || []).map((row) => ({
-      label: label(CONDITION_LABELS, row.label),
-      count: row.count,
-    }));
-    const formatRows = (stats.by_format || []).map((row) => ({
-      label: label(FORMAT_LABELS, row.label),
-      count: row.count,
-    }));
-
-    box.innerHTML = `
-      <div class="stat-cards">
-        ${cards.map((card) => `
-          <div class="stat-card">
-            <div class="label">${esc(card.label)}</div>
-            <div class="value">${esc(card.value)}</div>
-            <div class="sub">${esc(card.sub)}</div>
-          </div>`).join('')}
-      </div>
-
-      <div class="panels">
-        <div class="panel"><h3>Par plateforme</h3>${barList(stats.by_platform.slice(0, 14), stats.total)}</div>
-        <div class="panel"><h3>Par état</h3>${barList(conditionRows, stats.total)}</div>
-        <div class="panel"><h3>Par format</h3>${barList(formatRows, stats.total)}</div>
-        <div class="panel">
-          <h3>Plusieurs exemplaires</h3>
-          <div class="rank-list">
-            ${stats.most_copies.length
-              ? stats.most_copies.map((game) => `
-                  <div class="rank-item" data-open="${game.id}">
-                    <span class="t">${esc(game.title)}</span>
-                    <span class="v">×${game.quantity}</span>
-                  </div>`).join('')
-              : '<p style="color:var(--text-faint);font-size:13px">Aucun doublon</p>'}
-          </div>
-        </div>
-        <div class="panel">
-          <h3>Mieux notés</h3>
-          <div class="rank-list">
-            ${stats.top_rated.length
-              ? stats.top_rated.map((game, index) => `
-                  <div class="rank-item" data-open="${game.id}">
-                    <span class="idx">${index + 1}</span>
-                    <span class="t">${esc(game.title)}</span>
-                    <span class="v">${game.rating}</span>
-                  </div>`).join('')
-              : '<p style="color:var(--text-faint);font-size:13px">Aucun jeu noté</p>'}
-          </div>
-        </div>
-        <div class="panel">
-          <h3>Ajouts récents</h3>
-          <div class="rank-list">
-            ${stats.recent.length
-              ? stats.recent.map((game) => `
-                  <div class="rank-item" data-open="${game.id}">
-                    <span class="t">${esc(game.title)}</span>
-                    <span style="color:var(--text-faint);font-size:12px">${esc(fmtDate(game.created_at))}</span>
-                  </div>`).join('')
-              : '<p style="color:var(--text-faint);font-size:13px">Rien pour le moment</p>'}
-          </div>
-        </div>
-        ${stats.by_year.length
-          ? `<div class="panel" style="grid-column:1/-1"><h3>Par année de sortie</h3>${
-              barList(stats.by_year.map((r) => ({ label: String(r.label), count: r.count })), stats.total)
-            }</div>`
-          : ''}
-      </div>`;
-  } catch (err) {
-    box.innerHTML = `<div class="empty"><h3>Statistiques indisponibles</h3><p>${esc(err.message)}</p></div>`;
-  }
-}
-
-function showScreen(screen) {
-  state.screen = screen;
-  $('#view-collection').hidden = screen !== 'collection';
-  $('#view-stats').hidden = screen !== 'stats';
-  writeUrl();
-  if (screen === 'stats') renderStats();
-}
-
-/* ==========================================================================
    Theme
    ========================================================================== */
 
@@ -885,6 +975,7 @@ function bindEvents() {
     if (quick) {
       resetFilters();
       if (quick.dataset.quick === 'favorite') state.filters.favorite = '1';
+      if (quick.dataset.quick === 'incomplete') state.filters.incomplete = '1';
       document.body.classList.remove('sidebar-open');
       refresh();
       return;
@@ -909,7 +1000,7 @@ function bindEvents() {
     refresh();
   });
 
-  // Jaquette introuvable : on retombe sur l'initiale du titre.
+  // Visuel introuvable : on retombe sur l'initiale du titre.
   // L'evenement `error` d'une image ne remonte pas : on ecoute en capture.
   $('#games-container').addEventListener(
     'error',
@@ -967,17 +1058,19 @@ function bindEvents() {
     openGame(card.dataset.id);
   });
 
-  // Ouverture depuis les classements de la page statistiques
-  $('#stats-content').addEventListener('click', (event) => {
-    const item = event.target.closest('[data-open]');
-    if (item) openGame(item.dataset.open);
-  });
-
   // Tri
   $('#sort').addEventListener('change', (event) => {
     const [sort, dir] = event.target.value.split(':');
     state.sort = sort;
     state.dir = dir;
+    state.page = 1;
+    refresh();
+  });
+
+  // Nombre de jeux par page ("Tout afficher" inclus)
+  $('#page-size').addEventListener('change', (event) => {
+    state.limit = event.target.value;
+    store.set('gameshelf-limit', state.limit);
     state.page = 1;
     refresh();
   });
@@ -994,14 +1087,14 @@ function bindEvents() {
   $('#view-table').addEventListener('click', () => setView('table'));
 
   // Actions de l'en-tete
+  $('#btn-scan').addEventListener('click', () => openScanModal());
   $('#btn-add').addEventListener('click', () => openGameModal());
   $('#btn-io').addEventListener('click', openIoModal);
   $('#btn-account').addEventListener('click', openAccountModal);
-  $('#btn-stats').addEventListener('click', () => showScreen('stats'));
-  $('#btn-back-collection').addEventListener('click', () => showScreen('collection'));
   $('#brand-home').addEventListener('click', (event) => {
     event.preventDefault();
-    showScreen('collection');
+    resetFilters();
+    refresh();
   });
   $('#btn-theme').addEventListener('click', () => {
     applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
@@ -1015,14 +1108,18 @@ function bindEvents() {
   document.addEventListener('keydown', (event) => {
     if (document.querySelector('.modal-backdrop')) return;
     const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName);
+    if (typing && event.key !== 'Escape') return;
 
-    if (event.key === '/' && !typing) {
+    if (event.key === '/') {
       event.preventDefault();
       $('#search').focus();
-    } else if ((event.key === 'n' || event.key === 'N') && !typing && !event.ctrlKey && !event.metaKey) {
+    } else if ((event.key === 'n' || event.key === 'N') && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
       openGameModal();
-    } else if (event.key === 'Escape' && typing && event.target.id === 'search') {
+    } else if ((event.key === 's' || event.key === 'S') && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      openScanModal();
+    } else if (event.key === 'Escape' && event.target.id === 'search') {
       event.target.value = '';
       state.filters.search = '';
       refresh();
@@ -1034,7 +1131,7 @@ function bindEvents() {
     readUrl();
     $('#search').value = state.filters.search;
     $('#sort').value = `${state.sort}:${state.dir}`;
-    showScreen(state.screen);
+    $('#page-size').value = state.limit;
     refresh();
   });
 }
@@ -1057,6 +1154,7 @@ async function init() {
 
   $('#search').value = state.filters.search;
   $('#sort').value = `${state.sort}:${state.dir}`;
+  $('#page-size').value = state.limit;
   $('#view-grid').classList.toggle('active', state.view === 'grid');
   $('#view-table').classList.toggle('active', state.view === 'table');
 
@@ -1072,7 +1170,6 @@ async function init() {
     /* on continue : les appels suivants signaleront le probleme */
   }
 
-  showScreen(state.screen);
   await refresh({ withMeta: true });
 }
 

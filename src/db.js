@@ -37,11 +37,21 @@ const migrations = [
         developer     TEXT    NOT NULL DEFAULT '',
         publisher     TEXT    NOT NULL DEFAULT '',
         release_year  INTEGER,
+
+        -- Code-barres du boitier, utilise pour le scan depuis un telephone.
+        ean           TEXT    NOT NULL DEFAULT '',
+
         quantity      INTEGER NOT NULL DEFAULT 1,
         condition     TEXT    NOT NULL DEFAULT '',
         format        TEXT    NOT NULL DEFAULT 'physical',
+
+        -- Completude d'un exemplaire physique.
+        has_box       INTEGER NOT NULL DEFAULT 1,
+        has_cover_art INTEGER NOT NULL DEFAULT 1,
+        has_manual    INTEGER NOT NULL DEFAULT 1,
+        has_disc      INTEGER NOT NULL DEFAULT 1,
+
         rating        INTEGER,
-        price         REAL,
         purchase_date TEXT,
         favorite      INTEGER NOT NULL DEFAULT 0,
         cover_url     TEXT    NOT NULL DEFAULT '',
@@ -54,6 +64,7 @@ const migrations = [
       CREATE INDEX idx_games_title     ON games(title COLLATE NOCASE);
       CREATE INDEX idx_games_platform  ON games(platform);
       CREATE INDEX idx_games_condition ON games(condition);
+      CREATE INDEX idx_games_ean       ON games(ean);
     `);
   },
 ];
@@ -73,5 +84,8 @@ if (currentVersion < migrations.length) {
 export const CONDITIONS = ['sealed', 'mint', 'good', 'fair', 'poor'];
 
 export const FORMATS = ['physical', 'digital'];
+
+/** Elements dont on suit la presence pour un jeu physique. */
+export const PARTS = ['has_box', 'has_cover_art', 'has_manual', 'has_disc'];
 
 export default db;

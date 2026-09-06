@@ -81,20 +81,46 @@ const HEADER_ALIASES = {
   qty: 'quantity',
   note: 'rating',
   score: 'rating',
-  prix: 'price',
-  cost: 'price',
   achat: 'purchase_date',
   date_achat: 'purchase_date',
   favori: 'favorite',
-  jaquette: 'cover_url',
   cover: 'cover_url',
   image: 'cover_url',
+  visuel: 'cover_url',
   notes: 'notes',
   commentaire: 'notes',
   remarques: 'notes',
   tags: 'tags',
   etiquettes: 'tags',
+
+  // Code-barres
+  ean: 'ean',
+  ean13: 'ean',
+  code_barre: 'ean',
+  code_barres: 'ean',
+  codebarre: 'ean',
+  barcode: 'ean',
+  upc: 'ean',
+  gtin: 'ean',
+
+  // Completude d'un exemplaire physique
+  boite: 'has_box',
+  'boîte': 'has_box',
+  box: 'has_box',
+  jaquette: 'has_cover_art',
+  pochette: 'has_cover_art',
+  notice: 'has_manual',
+  manuel: 'has_manual',
+  livret: 'has_manual',
+  manual: 'has_manual',
+  disque: 'has_disc',
+  cd: 'has_disc',
+  dvd: 'has_disc',
+  cartouche: 'has_disc',
+  disc: 'has_disc',
 };
+
+const PART_KEYS = ['has_box', 'has_cover_art', 'has_manual', 'has_disc'];
 
 const CONDITION_ALIASES = {
   neuf: 'sealed',
@@ -145,6 +171,11 @@ const FORMAT_ALIASES = {
 const truthy = (value) =>
   ['1', 'true', 'oui', 'yes', 'x', 'vrai'].includes(String(value ?? '').trim().toLowerCase());
 
+/** Valeurs signalant une piece manquante dans un tableur. */
+const falsy = (value) =>
+  ['0', 'false', 'non', 'no', 'n', 'faux', 'manquant', 'manquante', 'absent', 'absente', 'sans']
+    .includes(String(value ?? '').trim().toLowerCase());
+
 function mapRow(raw) {
   const row = {};
   for (const [key, value] of Object.entries(raw)) {
@@ -163,10 +194,15 @@ function mapRow(raw) {
   }
   if (row.favorite !== undefined) row.favorite = truthy(row.favorite) ? 1 : 0;
 
-  // Les tableurs francais utilisent souvent la virgule decimale.
-  for (const numeric of ['rating', 'price']) {
-    if (typeof row[numeric] === 'string') row[numeric] = row[numeric].replace(',', '.');
+  // Completude : une case vide dans un tableur signifie "present" (valeur par
+  // defaut), on ne bascule a 0 que sur une valeur explicitement negative.
+  for (const part of PART_KEYS) {
+    if (row[part] === undefined || row[part] === '') continue;
+    row[part] = falsy(row[part]) ? 0 : 1;
   }
+
+  // Les tableurs francais utilisent souvent la virgule decimale.
+  if (typeof row.rating === 'string') row.rating = row.rating.replace(',', '.');
   return row;
 }
 

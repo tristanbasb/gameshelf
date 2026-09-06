@@ -34,8 +34,10 @@ app.use((_req, res, next) => {
       "default-src 'self'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      // Les jaquettes peuvent venir de n'importe quel hebergeur d'images.
+      // Les visuels peuvent venir de n'importe quel hebergeur d'images.
       'img-src * data: blob:',
+      // Flux de la camera pour le scan de codes-barres.
+      "media-src 'self' blob:",
       "connect-src 'self'",
       "form-action 'self'",
       "base-uri 'self'",

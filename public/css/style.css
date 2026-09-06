@@ -75,6 +75,14 @@
 
 * { box-sizing: border-box; }
 
+/*
+ * L'attribut `hidden` s'appuie sur `display:none` de la feuille du navigateur,
+ * qu'une regle `display` de la notre suffit a ecraser. On le reaffirme ici,
+ * sinon les blocs masques par le script (cadre camera, bloc de completude,
+ * boutons contextuels...) resteraient visibles.
+ */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -551,6 +559,85 @@ table.games td.title-cell { white-space: normal; font-weight: 550; min-width: 22
 }
 .cover-preview img { width: 100%; height: 100%; object-fit: cover; }
 .cover-fields { flex: 1; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+
+/* Cases a cocher de completude */
+.parts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+
+/* Pieces manquantes, sur une carte ou une ligne de tableau */
+.missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--danger-soft);
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Scanner de codes-barres
+   -------------------------------------------------------------------------- */
+
+.scanner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  display: grid;
+  place-items: center;
+}
+.scanner video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.scanner-reticle {
+  position: absolute;
+  left: 8%; right: 8%; top: 32%; bottom: 32%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.scanner-status {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  min-height: 20px;
+}
+
+.scan-hit {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--success);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+.scan-hit:hover { border-color: var(--border-strong); }
+.scan-hit.miss { border-left-color: var(--warning); }
+.scan-hit .h-title { font-weight: 650; font-size: 15px; }
+.scan-hit .h-meta { font-size: 13px; color: var(--text-muted); }
 
 .suggestions {
   margin-top: 12px;

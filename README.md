@@ -1,7 +1,11 @@
 # GameShelf
 
 Inventaire auto-hébergé pour une collection de jeux vidéo : quels jeux vous
-possédez, **en combien d'exemplaires**, et **dans quel état**.
+possédez, **en combien d'exemplaires**, **dans quel état**, et **ce qui manque**
+dans la boîte.
+
+Avec un **scan de code-barres depuis le téléphone** pour répondre en rayon à la
+seule question qui compte : « est-ce que je l'ai déjà ? »
 
 Application web légère (Node.js + SQLite, sans étape de build côté client),
 pensée pour tourner sur un petit serveur Ubuntu.
@@ -10,32 +14,60 @@ pensée pour tourner sur un petit serveur Ubuntu.
 
 ## Ce que fait l'application
 
-- **Fiche par jeu** : titre, plateforme, développeur, éditeur, année,
-  quantité, état, format (physique / dématérialisé), prix payé, date d'achat,
-  note personnelle, tags, jaquette, notes libres, favori.
-- **Recherche instantanée** sur le titre, le studio, l'éditeur, les tags et les notes.
-- **Filtres** par état, plateforme, format, tag et favoris — combinables, et
-  reflétés dans l'URL (une vue filtrée se met en marque-page ou se partage).
-- **Deux affichages** : grille de jaquettes, ou tableau triable colonne par colonne.
-- **Statistiques** : nombre de titres et d'exemplaires, répartition par état,
-  par plateforme, par format et par année, valeur d'achat cumulée, doublons.
+- **Fiche par jeu** : titre, plateforme, code-barres, quantité, état,
+  format (physique / dématérialisé), complétude, développeur, éditeur, année,
+  note, date d'achat, tags, visuel, notes libres, favori.
+- **Scan de code-barres** : ouvrez la caméra du téléphone, visez le dos du
+  boîtier, et l'application répond immédiatement — soit « ✓ vous l'avez déjà »
+  avec la quantité, l'état et les pièces manquantes, soit une proposition
+  d'ajout avec le code déjà rempli.
+- **Complétude** : cochez ce que contient l'exemplaire (boîte, jaquette papier,
+  notice, disque ou cartouche). La vue **Incomplets** liste d'un coup tout ce
+  qui est amputé d'une pièce.
+- **Recherche instantanée** sur le titre, le studio, l'éditeur, les tags, les
+  notes et le code-barres.
+- **Filtres** par état, plateforme, format, tag, favoris et incomplets —
+  combinables, et reflétés dans l'URL (une vue filtrée se met en marque-page).
+- **Deux affichages** : grille de visuels, ou tableau triable colonne par
+  colonne. Pagination réglable, avec une option **Tout afficher**.
 - **Import / export** CSV et JSON, plus une sauvegarde complète de la base.
-- **Jaquettes** : par URL, ou téléversées depuis le disque.
-- **Recherche en ligne** optionnelle (API RAWG) pour pré-remplir une fiche.
 - **Thème sombre / clair**, interface responsive, utilisable au clavier.
 - **Authentification** par session ; compte administrateur créé au premier
   démarrage.
 
 ### États disponibles
 
-| Valeur stockée | Libellé          |
-|----------------|------------------|
+| Valeur stockée | Libellé            |
+|----------------|--------------------|
 | `sealed`       | Neuf, sous blister |
-| `mint`         | Comme neuf       |
-| `good`         | Bon état         |
-| `fair`         | État correct     |
-| `poor`         | Abîmé            |
-| *(vide)*       | Non renseigné    |
+| `mint`         | Comme neuf         |
+| `good`         | Bon état           |
+| `fair`         | État correct       |
+| `poor`         | Abîmé              |
+| *(vide)*       | Non renseigné      |
+
+### Raccourcis clavier
+
+`s` scanner · `n` nouveau jeu · `/` recherche · `Échap` fermer / vider
+
+---
+
+## Le scan depuis le téléphone
+
+Ouvrez simplement l'application dans le navigateur du téléphone et touchez
+**Scanner**.
+
+> **La caméra exige une connexion HTTPS** (ou `localhost`) — c'est une règle des
+> navigateurs, pas de l'application. En HTTP simple, le scan bascule
+> automatiquement sur une saisie manuelle du code. Suivez la procédure nginx +
+> certbot ci-dessous pour obtenir un certificat.
+
+La lecture s'appuie sur l'API `BarcodeDetector` du navigateur, disponible sur
+Chrome pour Android. Sur un navigateur qui ne la propose pas (Safari iOS
+notamment), la saisie manuelle du code reste disponible et donne la même
+réponse.
+
+Formats lus : EAN-13, EAN-8, UPC-A, UPC-E, Code 128, ITF.
 
 ---
 
@@ -46,7 +78,7 @@ pensée pour tourner sur un petit serveur Ubuntu.
 Prérequis : Docker et le plugin Compose.
 
 ```bash
-git clone <url-du-depot> gameshelf && cd gameshelf
+git clone https://github.com/tristanbasb/gameshelf.git && cd gameshelf
 cp .env.example .env
 ```
 
@@ -65,10 +97,8 @@ docker compose up -d --build
 
 L'application écoute sur `127.0.0.1:3000`. Pour y accéder depuis le réseau
 local, remplacez le mapping de ports dans `docker-compose.yml` par
-`"3000:3000"` ; pour une exposition publique, placez un reverse proxy HTTPS
-devant (voir plus bas) et gardez `TRUST_PROXY=1`.
-
-Commandes utiles :
+`"3000:3000"` ; pour une exposition publique — et pour le scan par caméra —
+placez un reverse proxy HTTPS devant et gardez `TRUST_PROXY=1`.
 
 ```bash
 docker compose logs -f          # suivre les logs
@@ -83,11 +113,11 @@ Le script gère tout : Node.js, utilisateur système dédié, dépendances,
 service systemd et, si vous le demandez, nginx.
 
 ```bash
-git clone <url-du-depot> gameshelf && cd gameshelf
+git clone https://github.com/tristanbasb/gameshelf.git && cd gameshelf
 sudo ./deploy/install.sh
 ```
 
-Avec un nom de domaine et un reverse proxy nginx :
+Avec un nom de domaine, un reverse proxy nginx et HTTPS (nécessaire au scan) :
 
 ```bash
 sudo ./deploy/install.sh --nginx jeux.mondomaine.fr
@@ -114,8 +144,9 @@ cp .env.example .env
 npm start
 ```
 
-Puis <http://localhost:3000>. Le mot de passe administrateur généré s'affiche
-une seule fois dans la console au tout premier démarrage.
+Puis <http://localhost:3000> — `localhost` étant un contexte sécurisé, le scan
+par caméra fonctionne aussi en local. Le mot de passe administrateur généré
+s'affiche une seule fois dans la console au tout premier démarrage.
 
 ---
 
@@ -128,15 +159,15 @@ ou environnement systemd/Docker). Voir [`.env.example`](.env.example).
 |---|---|---|
 | `PORT` | `3000` | Port d'écoute |
 | `HOST` | `0.0.0.0` | Interface d'écoute (`127.0.0.1` derrière un proxy) |
-| `DATA_DIR` | `./data` | Base SQLite + jaquettes téléversées |
+| `DATA_DIR` | `./data` | Base SQLite + images téléversées |
 | `ADMIN_USERNAME` | `admin` | Identifiant créé au premier démarrage |
 | `ADMIN_PASSWORD` | *(vide)* | Si vide, un mot de passe aléatoire est généré et affiché dans les logs |
 | `SESSION_SECRET` | *(généré)* | À définir en production (`openssl rand -hex 32`) |
 | `SESSION_DAYS` | `30` | Durée de validité d'une session |
 | `TRUST_PROXY` | `0` | `1` derrière un reverse proxy (X-Forwarded-*) |
 | `DISABLE_AUTH` | `0` | `1` pour supprimer la connexion — réseau privé uniquement |
-| `RAWG_API_KEY` | *(vide)* | Active la recherche en ligne ([rawg.io/apidocs](https://rawg.io/apidocs)) |
-| `MAX_UPLOAD_MB` | `5` | Taille maximale d'une jaquette |
+| `RAWG_API_KEY` | *(vide)* | Active le pré-remplissage en ligne ([rawg.io/apidocs](https://rawg.io/apidocs)) |
+| `MAX_UPLOAD_MB` | `5` | Taille maximale d'une image |
 
 ---
 
@@ -149,14 +180,18 @@ La première ligne du CSV donne les en-têtes. Les noms français courants sont
 reconnus :
 
 ```csv
-titre,plateforme,quantité,état,format,année,prix,éditeur,tags,notes
-Chrono Trigger,Super Nintendo,1,comme neuf,physique,1995,120,Square,collector,Boîte + notice
-Tetris,Game Boy,4,correct,physique,1989,8,Nintendo,,Trois cartouches + une en boîte
+titre,plateforme,ean,quantité,état,format,boîte,jaquette,notice,disque,année,éditeur,tags,notes
+Chrono Trigger,Super Nintendo,3307210001003,1,comme neuf,physique,oui,oui,oui,oui,1995,Square,collector,Rangé étagère 2
+Tetris,Game Boy,3307210001004,4,correct,physique,non,non,non,oui,1989,Nintendo,,Trois cartouches nues
 ```
 
-Les valeurs d'état sont converties automatiquement : `neuf`, `sous blister`,
-`comme neuf`, `TBE`, `bon état`, `correct`, `abîmé`… Idem pour le format
-(`physique`, `démat`, `steam`…).
+Conversions automatiques :
+
+- **État** : `neuf`, `sous blister`, `comme neuf`, `TBE`, `bon état`,
+  `correct`, `abîmé`…
+- **Format** : `physique`, `démat`, `steam`…
+- **Complétude** : une colonne vide vaut « présent » ; écrivez `non`,
+  `manquant` ou `absent` pour signaler une pièce manquante.
 
 Deux modes :
 
@@ -211,9 +246,9 @@ Toutes les sessions existantes sont révoquées.
 ./scripts/smoke-test.sh http://localhost:3000 admin 'votre-mot-de-passe'
 ```
 
-Le script teste l'ensemble des routes (lecture, création, modification,
-validation des entrées, import, export, sauvegarde, pages statiques) et
-supprime les données de test qu'il a créées.
+Le script teste l'ensemble des routes (lecture, création, modification, scan
+par code-barres, filtre des incomplets, validation des entrées, import, export,
+sauvegarde, pages statiques) et supprime les données de test qu'il a créées.
 
 ---
 
@@ -235,16 +270,17 @@ Toutes les routes `/api/*` exigent le cookie de session, obtenu via
 | `PUT` | `/api/games/:id` | Modification (fusion partielle) |
 | `POST` | `/api/games/:id/favorite` | Bascule du favori |
 | `DELETE` | `/api/games/:id` | Suppression |
-| `GET` | `/api/meta` | Plateformes, développeurs et tags existants |
-| `GET` | `/api/stats` | Statistiques agrégées |
+| `GET` | `/api/lookup?ean=` | « Est-ce que je l'ai ? » — recherche par code-barres |
+| `GET` | `/api/meta` | Plateformes, tags, compteurs des vues rapides |
 | `GET` | `/api/export?format=csv\|json` | Export |
 | `POST` | `/api/import` | Import (`{content, format, mode}`) |
 | `GET` | `/api/backup` | Copie de la base SQLite |
-| `POST` | `/api/upload` | Téléversement d'une jaquette (`multipart`, champ `cover`) |
+| `POST` | `/api/upload` | Téléversement d'une image (`multipart`, champ `cover`) |
 | `GET` | `/api/external/search?q=` | Recherche RAWG (si clé configurée) |
 
-Paramètres de `GET /api/games` : `search`, `platform`, `condition`, `format`,
-`tag`, `favorite=1`, `sort`, `dir`, `page`, `limit`.
+Paramètres de `GET /api/games` : `search`, `ean`, `platform`, `condition`,
+`format`, `tag`, `favorite=1`, `incomplete=1`, `sort`, `dir`, `page`,
+`limit` (`limit=all` renvoie toute la collection).
 
 ---
 
@@ -262,6 +298,10 @@ public/         interface (HTML, CSS, JS natif — aucun build)
 deploy/         install.sh, update.sh, unité systemd, conf nginx
 scripts/        sauvegarde, réinitialisation de mot de passe, smoke-test
 ```
+
+Le schéma évolue par migrations incrémentales (`PRAGMA user_version` dans
+`src/db.js`) : ajoutez une fonction à la fin du tableau, ne modifiez jamais les
+précédentes.
 
 ---
 

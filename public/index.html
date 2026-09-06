@@ -28,17 +28,21 @@
 
   <div class="search-wrap">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input type="search" id="search" class="input" placeholder="Rechercher un titre, un studio, un tag…" autocomplete="off" aria-label="Rechercher">
+    <input type="search" id="search" class="input" placeholder="Titre, studio, tag, code-barres…" autocomplete="off" aria-label="Rechercher">
   </div>
 
   <div class="topbar-actions">
-    <button class="btn btn-primary" id="btn-add">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      <span class="hide-sm">Ajouter</span>
+    <button class="btn btn-primary" id="btn-scan" title="Scanner un code-barres">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+        <path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/>
+      </svg>
+      <span class="hide-sm">Scanner</span>
     </button>
 
-    <button class="btn btn-ghost btn-icon" id="btn-stats" title="Statistiques" aria-label="Statistiques">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+    <button class="btn" id="btn-add" title="Ajouter un jeu (n)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="hide-sm">Ajouter</span>
     </button>
 
     <button class="btn btn-ghost btn-icon" id="btn-io" title="Import / export" aria-label="Import et export">
@@ -70,6 +74,10 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 17.3-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg>
           Favoris <span class="count" id="count-fav"></span>
         </button>
+        <button class="filter-item" data-quick="incomplete">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          Incomplets <span class="count" id="count-incomplete"></span>
+        </button>
       </div>
     </div>
 
@@ -95,59 +103,84 @@
   </aside>
 
   <main class="main">
-    <!-- Vue collection -->
-    <section id="view-collection">
-      <div class="chips" id="active-filters"></div>
+    <div class="chips" id="active-filters"></div>
 
-      <div class="toolbar">
-        <span class="result-count" id="result-count"></span>
-        <div class="spacer"></div>
+    <div class="toolbar">
+      <span class="result-count" id="result-count"></span>
+      <div class="spacer"></div>
 
-        <select class="select" id="sort" style="width:auto" aria-label="Trier par">
-          <option value="created_at:desc">Ajout récent</option>
-          <option value="created_at:asc">Ajout ancien</option>
-          <option value="title:asc">Titre (A→Z)</option>
-          <option value="title:desc">Titre (Z→A)</option>
-          <option value="rating:desc">Meilleure note</option>
-          <option value="rating:asc">Moins bonne note</option>
-          <option value="release_year:desc">Plus récent</option>
-          <option value="release_year:asc">Plus ancien</option>
-          <option value="quantity:desc">Quantité décroissante</option>
-          <option value="price:desc">Prix décroissant</option>
-          <option value="price:asc">Prix croissant</option>
-          <option value="platform:asc">Plateforme</option>
-        </select>
+      <select class="select" id="sort" style="width:auto" aria-label="Trier par">
+        <option value="created_at:desc">Ajout récent</option>
+        <option value="created_at:asc">Ajout ancien</option>
+        <option value="title:asc">Titre (A→Z)</option>
+        <option value="title:desc">Titre (Z→A)</option>
+        <option value="rating:desc">Meilleure note</option>
+        <option value="release_year:desc">Plus récent</option>
+        <option value="release_year:asc">Plus ancien</option>
+        <option value="quantity:desc">Quantité décroissante</option>
+        <option value="platform:asc">Plateforme</option>
+      </select>
 
-        <div class="view-toggle" role="group" aria-label="Mode d'affichage">
-          <button id="view-grid" class="active" title="Grille" aria-label="Vue grille">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          </button>
-          <button id="view-table" title="Tableau" aria-label="Vue tableau">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-          </button>
-        </div>
-      </div>
+      <select class="select" id="page-size" style="width:auto" aria-label="Nombre de jeux par page">
+        <option value="60">60 par page</option>
+        <option value="120">120 par page</option>
+        <option value="240">240 par page</option>
+        <option value="all">Tout afficher</option>
+      </select>
 
-      <div id="games-container" aria-live="polite"></div>
-      <div class="pagination" id="pagination"></div>
-    </section>
-
-    <!-- Vue statistiques -->
-    <section id="view-stats" hidden>
-      <div class="toolbar">
-        <h2>Statistiques</h2>
-        <div class="spacer"></div>
-        <button class="btn" id="btn-back-collection">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
-          Retour à la collection
+      <div class="view-toggle" role="group" aria-label="Mode d'affichage">
+        <button id="view-grid" class="active" title="Grille" aria-label="Vue grille">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        <button id="view-table" title="Tableau" aria-label="Vue tableau">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
         </button>
       </div>
-      <div id="stats-content"></div>
-    </section>
+    </div>
+
+    <div id="games-container" aria-live="polite"></div>
+    <div class="pagination" id="pagination"></div>
   </main>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- ======================= Modale : scan d'un code-barres ======================= -->
+<template id="tpl-scan-modal">
+  <div class="modal-backdrop" data-close-on-backdrop>
+    <div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="scan-title">
+      <div class="modal-head">
+        <h2 id="scan-title">Scanner un code-barres</h2>
+        <button class="btn btn-ghost btn-icon" data-close aria-label="Fermer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="scanner" id="scanner-frame">
+          <video id="scanner-video" playsinline muted></video>
+          <div class="scanner-reticle"></div>
+        </div>
+        <p class="scanner-status" id="scanner-status">Démarrage de la caméra…</p>
+
+        <div class="field" style="margin-top:14px">
+          <label for="scan-manual">Ou saisir le code à la main</label>
+          <div style="display:flex; gap:8px">
+            <input class="input" id="scan-manual" inputmode="numeric" autocomplete="off"
+                   placeholder="3307210000000" maxlength="14">
+            <button type="button" class="btn" id="btn-scan-manual">Chercher</button>
+          </div>
+        </div>
+
+        <div id="scan-result" style="margin-top:16px"></div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn" data-close>Fermer</button>
+      </div>
+    </div>
+  </div>
+</template>
 
 <!-- ======================= Modale : fiche de jeu ======================= -->
 <template id="tpl-game-modal">
@@ -167,7 +200,7 @@
               <label for="f-title">Titre *</label>
               <div style="display:flex; gap:8px">
                 <input class="input" id="f-title" name="title" required maxlength="200" autocomplete="off">
-                <button type="button" class="btn" id="btn-lookup" hidden title="Récupérer les infos depuis RAWG">
+                <button type="button" class="btn" id="btn-lookup" hidden title="Récupérer les infos en ligne">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                   <span class="hide-sm">En ligne</span>
                 </button>
@@ -176,7 +209,7 @@
             </div>
 
             <div class="field full">
-              <label>Jaquette</label>
+              <label>Visuel</label>
               <div class="cover-picker">
                 <div class="cover-preview" id="cover-preview">Aucune image</div>
                 <div class="cover-fields">
@@ -194,6 +227,16 @@
               <label for="f-platform">Plateforme</label>
               <input class="input" id="f-platform" name="platform" list="dl-platforms" autocomplete="off" placeholder="PS5, Switch, PC…">
               <datalist id="dl-platforms"></datalist>
+            </div>
+
+            <div class="field">
+              <label for="f-ean">Code-barres (EAN)</label>
+              <div style="display:flex; gap:8px">
+                <input class="input" id="f-ean" name="ean" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="8 à 14 chiffres">
+                <button type="button" class="btn btn-icon" id="btn-scan-field" title="Scanner" aria-label="Scanner le code-barres">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg>
+                </button>
+              </div>
             </div>
 
             <div class="field">
@@ -221,6 +264,17 @@
               </select>
             </div>
 
+            <div class="field full" id="parts-block">
+              <label>Ce que contient l'exemplaire</label>
+              <div class="parts-grid">
+                <label class="switch"><input type="checkbox" id="f-has_box" checked><span>Boîte</span></label>
+                <label class="switch"><input type="checkbox" id="f-has_cover_art" checked><span>Jaquette papier</span></label>
+                <label class="switch"><input type="checkbox" id="f-has_manual" checked><span>Notice</span></label>
+                <label class="switch"><input type="checkbox" id="f-has_disc" checked><span>Disque / cartouche</span></label>
+              </div>
+              <span class="hint">Décochez ce qui manque. Un jeu dématérialisé n'est jamais compté comme incomplet.</span>
+            </div>
+
             <div class="field">
               <label for="f-developer">Développeur</label>
               <input class="input" id="f-developer" name="developer" list="dl-developers" autocomplete="off">
@@ -243,13 +297,15 @@
             </div>
 
             <div class="field">
-              <label for="f-price">Prix payé (€ par exemplaire)</label>
-              <input class="input" id="f-price" name="price" type="number" min="0" step="0.01" inputmode="decimal">
+              <label for="f-purchase">Date d'achat</label>
+              <input class="input" id="f-purchase" name="purchase_date" type="date">
             </div>
 
             <div class="field">
-              <label for="f-purchase">Date d'achat</label>
-              <input class="input" id="f-purchase" name="purchase_date" type="date">
+              <label class="switch" style="margin-top:22px">
+                <input type="checkbox" id="f-favorite" name="favorite">
+                <span>Marquer comme favori</span>
+              </label>
             </div>
 
             <div class="field full">
@@ -259,14 +315,7 @@
 
             <div class="field full">
               <label for="f-notes">Notes</label>
-              <textarea class="textarea" id="f-notes" name="notes" maxlength="8000" placeholder="Impressions, état de la boîte, où il est rangé…"></textarea>
-            </div>
-
-            <div class="field full">
-              <label class="switch">
-                <input type="checkbox" id="f-favorite" name="favorite">
-                <span>Marquer comme favori</span>
-              </label>
+              <textarea class="textarea" id="f-notes" name="notes" maxlength="8000" placeholder="État de la boîte, où il est rangé, pièces manquantes…"></textarea>
             </div>
           </div>
         </div>
@@ -300,10 +349,11 @@
         </div>
 
         <h3 style="font-size:14px; margin-bottom:10px">Importer</h3>
-        <p class="hint" style="color:var(--text-muted); font-size:13px; margin:0 0 12px">
-          Fichier CSV ou JSON. La première ligne d'un CSV doit contenir les en-têtes :
-          <code>titre, plateforme, quantité, état, format, prix, année, éditeur, tags, notes</code>
-          sont reconnus (« neuf », « bon état », « abîmé »… sont convertis automatiquement).
+        <p style="color:var(--text-muted); font-size:13px; margin:0 0 12px">
+          Fichier CSV ou JSON. La première ligne d'un CSV donne les en-têtes :
+          <code>titre, plateforme, ean, quantité, état, format, boîte, jaquette, notice, disque, année, éditeur, tags, notes</code>
+          sont reconnus. Pour la complétude, écrivez <code>non</code> ou <code>manquant</code>
+          dans la colonne correspondante.
         </p>
 
         <div class="field" style="margin-bottom:12px">

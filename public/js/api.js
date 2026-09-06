@@ -75,8 +75,10 @@ export const api = {
   deleteGame: (id) => request(`/api/games/${id}`, { method: 'DELETE' }),
   toggleFavorite: (id) => request(`/api/games/${id}/favorite`, { method: 'POST' }),
 
+  /** "Est-ce que j'ai deja ce jeu ?" — recherche par code-barres. */
+  lookup: (ean) => request(`/api/lookup?ean=${encodeURIComponent(ean)}`),
+
   meta: () => request('/api/meta'),
-  stats: () => request('/api/stats'),
 
   uploadCover: (file) => {
     const form = new FormData();

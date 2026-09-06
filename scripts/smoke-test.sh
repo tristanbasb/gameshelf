@@ -88,11 +88,11 @@ fi
 # --- 4. Lecture -------------------------------------------------------------
 check "GET /api/games"  "$(status "$BASE_URL/api/games")"  "200"
 check "GET /api/meta"   "$(status "$BASE_URL/api/meta")"   "200"
-check "GET /api/stats"  "$(status "$BASE_URL/api/stats")"  "200"
+check "GET /api/lookup"  "$(status "$BASE_URL/api/lookup?ean=3307210000000")"  "200"
 
 # --- 5. Creation ------------------------------------------------------------
 create_body="$(curl -s -b "$COOKIE_JAR" -H 'Content-Type: application/json' \
-  -d '{"title":"__smoke_test__","platform":"Test","condition":"good","quantity":2,"rating":7,"price":12.5}' \
+  -d '{"title":"__smoke_test__","platform":"Test","condition":"good","quantity":2,"rating":7,"ean":"3307219999999","has_manual":0}' \
   "$BASE_URL/api/games")"
 
 CREATED_ID="$(printf '%s' "$create_body" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')"
@@ -108,6 +108,24 @@ if [[ -n "$CREATED_ID" ]]; then
   check "PUT /api/games/:id"    "$(status -X PUT -H 'Content-Type: application/json' \
     -d '{"title":"__smoke_test__","condition":"mint","quantity":3}' "$BASE_URL/api/games/$CREATED_ID")" "200"
   check "POST favori"           "$(status -X POST "$BASE_URL/api/games/$CREATED_ID/favorite")" "200"
+
+  # Le jeu cree porte un code-barres et une notice manquante : on verifie que
+  # le scan le retrouve et que le filtre "incomplets" le remonte.
+  lookup_body="$(curl -s -b "$COOKIE_JAR" "$BASE_URL/api/lookup?ean=3307219999999")"
+  if [[ "$lookup_body" == *'"found":true'* ]]; then
+    printf '%s  PASS%s  /api/lookup retrouve le jeu par son code-barres\n' "$c_green" "$c_reset"
+  else
+    printf '%s  FAIL%s  /api/lookup : %s\n' "$c_red" "$c_reset" "$lookup_body"
+    FAILURES=$((FAILURES + 1))
+  fi
+
+  incomplete_body="$(curl -s -b "$COOKIE_JAR" "$BASE_URL/api/games?incomplete=1&search=__smoke_test__")"
+  if [[ "$incomplete_body" == *'__smoke_test__'* ]]; then
+    printf '%s  PASS%s  filtre incomplete=1 remonte le jeu sans notice\n' "$c_green" "$c_reset"
+  else
+    printf '%s  FAIL%s  filtre incomplete=1 : jeu non trouve\n' "$c_red" "$c_reset"
+    FAILURES=$((FAILURES + 1))
+  fi
 fi
 
 # --- 6. Validation des entrees ---------------------------------------------
@@ -117,7 +135,10 @@ check "POST etat invalide -> 400" "$(status -H 'Content-Type: application/json' 
   -d '{"title":"x","condition":"nimportequoi"}' "$BASE_URL/api/games")" "400"
 check "POST quantite invalide -> 400" "$(status -H 'Content-Type: application/json' \
   -d '{"title":"x","quantity":0}' "$BASE_URL/api/games")" "400"
+check "POST code-barres invalide -> 400" "$(status -H 'Content-Type: application/json' \
+  -d '{"title":"x","ean":"abc123"}' "$BASE_URL/api/games")" "400"
 check "GET jeu inexistant -> 404" "$(status "$BASE_URL/api/games/99999999")" "404"
+check "GET tout afficher (limit=all)" "$(status "$BASE_URL/api/games?limit=all")" "200"
 
 # --- 7. Export --------------------------------------------------------------
 check "GET /api/export?format=csv"  "$(status "$BASE_URL/api/export?format=csv")"  "200"
@@ -126,7 +147,7 @@ check "GET /api/backup"             "$(status "$BASE_URL/api/backup")"          
 
 # --- 8. Import --------------------------------------------------------------
 import_code="$(status -H 'Content-Type: application/json' \
-  -d '{"format":"csv","mode":"merge","content":"titre,plateforme,quantite,etat\n__smoke_import__,Test,2,bon etat\n"}' \
+  -d '{"format":"csv","mode":"merge","content":"titre,plateforme,quantite,etat,notice,ean\n__smoke_import__,Test,2,bon etat,non,3307218888888\n"}' \
   "$BASE_URL/api/import")"
 check "POST /api/import" "$import_code" "200"
 

@@ -1,4 +1,4 @@
-import { db, CONDITIONS, FORMATS } from './db.js';
+import { db, CONDITIONS, FORMATS, PARTS } from './db.js';
 
 const MAX_TEXT = 120;
 const MAX_NOTES = 8000;
@@ -12,6 +12,13 @@ export class ValidationError extends Error {
 }
 
 const str = (value, max = MAX_TEXT) => String(value ?? '').trim().slice(0, max);
+
+/** Coche / case a cocher : accepte booleens, entiers et chaines de formulaire. */
+const flag = (value, fallback = 1) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (value === true || value === 1 || value === '1' || value === 'on' || value === 'true') return 1;
+  return 0;
+};
 
 function optionalNumber(value, { min, max, integer = false, label }) {
   if (value === undefined || value === null || value === '') return null;
@@ -32,6 +39,21 @@ function optionalDate(value, label) {
   return s;
 }
 
+/**
+ * Code-barres : on ne garde que les chiffres (les scanners et les copier-coller
+ * ajoutent souvent espaces et tirets). Longueurs usuelles : UPC-A 12,
+ * EAN-13 13, EAN-8 8, ITF-14 14.
+ */
+export function normalizeEan(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const digits = raw.replace(/[\s-]/g, '');
+  if (!/^\d{8,14}$/.test(digits)) {
+    throw new ValidationError('Code-barres : 8 a 14 chiffres attendus');
+  }
+  return digits;
+}
+
 export function normalizeTags(value) {
   const list = Array.isArray(value) ? value : String(value ?? '').split(',');
   const seen = new Set();
@@ -47,7 +69,7 @@ export function normalizeTags(value) {
   return out.slice(0, 20).join(', ');
 }
 
-/** Nettoie une URL de jaquette : http(s) externe, ou chemin /uploads/ local. */
+/** Nettoie une URL d'image : http(s) externe, ou chemin /uploads/ local. */
 function normalizeCoverUrl(value) {
   const raw = String(value ?? '').trim().slice(0, 1000);
   if (!raw) return '';
@@ -58,7 +80,7 @@ function normalizeCoverUrl(value) {
   } catch {
     /* url invalide */
   }
-  throw new ValidationError('Jaquette : URL invalide (http:// ou https:// attendu)');
+  throw new ValidationError('Image : URL invalide (http:// ou https:// attendu)');
 }
 
 /** Transforme une charge utile brute en ligne prete pour la base. */
@@ -81,7 +103,7 @@ export function normalizeGame(input = {}) {
     min: 1, max: 9999, integer: true, label: 'Quantite',
   });
 
-  return {
+  const row = {
     title,
     platform: str(input.platform),
     developer: str(input.developer),
@@ -89,23 +111,31 @@ export function normalizeGame(input = {}) {
     release_year: optionalNumber(input.release_year, {
       min: 1950, max: 2100, integer: true, label: 'Annee de sortie',
     }),
+    ean: normalizeEan(input.ean),
     quantity: quantity ?? 1,
     condition,
     format,
     rating: optionalNumber(input.rating, { min: 0, max: 10, integer: true, label: 'Note' }),
-    price: optionalNumber(input.price, { min: 0, max: 1000000, label: 'Prix' }),
     purchase_date: optionalDate(input.purchase_date, "Date d'achat"),
-    favorite: input.favorite === true || input.favorite === 1 || input.favorite === '1' ? 1 : 0,
+    favorite: flag(input.favorite, 0),
     cover_url: normalizeCoverUrl(input.cover_url),
     notes: str(input.notes, MAX_NOTES),
     tags: normalizeTags(input.tags),
   };
+
+  // Un jeu dematerialise n'a ni boite, ni notice, ni disque : on neutralise
+  // ces champs pour que le calcul d'incomplet ne le signale jamais.
+  for (const part of PARTS) {
+    row[part] = format === 'digital' ? 1 : flag(input[part], 1);
+  }
+
+  return row;
 }
 
 const COLUMNS = [
-  'title', 'platform', 'developer', 'publisher', 'release_year',
-  'quantity', 'condition', 'format', 'rating', 'price', 'purchase_date',
-  'favorite', 'cover_url', 'notes', 'tags',
+  'title', 'platform', 'developer', 'publisher', 'release_year', 'ean',
+  'quantity', 'condition', 'format', ...PARTS,
+  'rating', 'purchase_date', 'favorite', 'cover_url', 'notes', 'tags',
 ];
 
 const SORTABLE = {
@@ -114,10 +144,12 @@ const SORTABLE = {
   quantity: 'quantity',
   release_year: 'release_year',
   rating: 'rating',
-  price: 'price',
   created_at: 'created_at',
   updated_at: 'updated_at',
 };
+
+/** Condition SQL : au moins un element manquant sur un exemplaire physique. */
+const INCOMPLETE_SQL = `(format = 'physical' AND (${PARTS.map((p) => `${p} = 0`).join(' OR ')}))`;
 
 export function listGames(query = {}) {
   const where = [];
@@ -126,9 +158,14 @@ export function listGames(query = {}) {
   if (query.search) {
     where.push(
       '(title LIKE @search OR developer LIKE @search OR publisher LIKE @search'
-      + ' OR tags LIKE @search OR notes LIKE @search OR platform LIKE @search)',
+      + ' OR tags LIKE @search OR notes LIKE @search OR platform LIKE @search'
+      + ' OR ean LIKE @search)',
     );
     params.search = `%${String(query.search).trim()}%`;
+  }
+  if (query.ean) {
+    where.push('ean = @ean');
+    params.ean = String(query.ean).replace(/[\s-]/g, '');
   }
   if (query.platform) {
     where.push('platform = @platform');
@@ -145,6 +182,9 @@ export function listGames(query = {}) {
   if (query.favorite === '1' || query.favorite === true) {
     where.push('favorite = 1');
   }
+  if (query.incomplete === '1' || query.incomplete === true) {
+    where.push(INCOMPLETE_SQL);
+  }
   if (query.tag) {
     where.push("(', ' || tags || ',') LIKE @tag");
     params.tag = `%, ${String(query.tag).trim()},%`;
@@ -158,9 +198,12 @@ export function listGames(query = {}) {
   // elles sont vides, quel que soit le sens de tri.
   const orderSql = `ORDER BY (${SORTABLE[sortKey]}) IS NULL, ${SORTABLE[sortKey]} ${direction}, id DESC`;
 
-  const limit = Math.min(Math.max(Number.parseInt(query.limit, 10) || 60, 1), 500);
-  const page = Math.max(Number.parseInt(query.page, 10) || 1, 1);
-  const offset = (page - 1) * limit;
+  // limit=0 (ou "all") : on renvoie toute la collection, sans pagination.
+  const rawLimit = String(query.limit ?? '').toLowerCase();
+  const showAll = rawLimit === 'all' || rawLimit === '0';
+  const limit = showAll ? -1 : Math.min(Math.max(Number.parseInt(query.limit, 10) || 60, 1), 1000);
+  const page = showAll ? 1 : Math.max(Number.parseInt(query.page, 10) || 1, 1);
+  const offset = showAll ? 0 : (page - 1) * limit;
 
   // better-sqlite3 refuse un objet de parametres pour une requete qui n'en
   // attend aucun : sans filtre actif, on appelle get() sans argument.
@@ -169,6 +212,7 @@ export function listGames(query = {}) {
   );
   const counts = Object.keys(params).length ? countStmt.get(params) : countStmt.get();
 
+  // LIMIT -1 signifie "aucune limite" en SQLite.
   const items = db
     .prepare(`SELECT * FROM games ${whereSql} ${orderSql} LIMIT @limit OFFSET @offset`)
     .all({ ...params, limit, offset });
@@ -178,12 +222,21 @@ export function listGames(query = {}) {
     total: counts.n,
     copies: counts.copies,
     page,
-    limit,
-    pages: Math.max(Math.ceil(counts.n / limit), 1),
+    limit: showAll ? 'all' : limit,
+    pages: showAll ? 1 : Math.max(Math.ceil(counts.n / limit), 1),
   };
 }
 
 export const getGame = (id) => db.prepare('SELECT * FROM games WHERE id = ?').get(id);
+
+/** Recherche par code-barres, pour le scan depuis un telephone. */
+export function findByEan(ean) {
+  const clean = normalizeEan(ean);
+  if (!clean) return [];
+  return db
+    .prepare('SELECT * FROM games WHERE ean = ? ORDER BY id ASC')
+    .all(clean);
+}
 
 export function createGame(payload) {
   const data = normalizeGame(payload);
@@ -222,7 +275,10 @@ export const insertMany = db.transaction((rows) => {
   return rows.length;
 });
 
-/** Valeurs distinctes utilisees par les filtres de l'interface. */
+/**
+ * Tout ce dont la barre laterale a besoin : valeurs distinctes pour les
+ * filtres, et compteurs des vues rapides.
+ */
 export function getMeta() {
   const distinct = (column) =>
     db
@@ -231,6 +287,11 @@ export function getMeta() {
           WHERE ${column} <> '' GROUP BY ${column} COLLATE NOCASE
           ORDER BY count DESC, value COLLATE NOCASE ASC`,
       )
+      .all();
+
+  const groupBy = (column) =>
+    db
+      .prepare(`SELECT ${column} AS label, COUNT(*) AS count FROM games GROUP BY ${column}`)
       .all();
 
   const tagCounts = new Map();
@@ -242,6 +303,16 @@ export function getMeta() {
     }
   }
 
+  const totals = db
+    .prepare(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(quantity), 0) AS copies,
+              SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END) AS favorites,
+              SUM(CASE WHEN ${INCOMPLETE_SQL} THEN 1 ELSE 0 END) AS incomplete
+         FROM games`,
+    )
+    .get();
+
   return {
     platforms: distinct('platform'),
     developers: distinct('developer'),
@@ -250,63 +321,15 @@ export function getMeta() {
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
     conditions: CONDITIONS,
     formats: FORMATS,
-  };
-}
-
-export function getStats() {
-  const totals = db
-    .prepare(
-      `SELECT
-         COUNT(*)                                       AS total,
-         COALESCE(SUM(quantity), 0)                     AS copies,
-         COALESCE(SUM(price * quantity), 0)             AS total_spent,
-         COUNT(rating)                                  AS rated_count,
-         COALESCE(AVG(rating), 0)                       AS avg_rating,
-         SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END)  AS favorites,
-         SUM(CASE WHEN quantity > 1 THEN 1 ELSE 0 END)  AS duplicates,
-         COUNT(DISTINCT CASE WHEN platform <> '' THEN platform END) AS platform_count
-       FROM games`,
-    )
-    .get();
-
-  const groupBy = (column) =>
-    db
-      .prepare(
-        `SELECT CASE WHEN ${column} = '' THEN '' ELSE ${column} END AS label,
-                COUNT(*) AS count, COALESCE(SUM(quantity), 0) AS copies
-           FROM games GROUP BY label ORDER BY count DESC, label ASC`,
-      )
-      .all();
-
-  return {
-    ...totals,
-    by_platform: groupBy('platform'),
     by_condition: groupBy('condition'),
     by_format: groupBy('format'),
-    by_year: db
-      .prepare(
-        `SELECT release_year AS label, COUNT(*) AS count FROM games
-          WHERE release_year IS NOT NULL GROUP BY release_year ORDER BY release_year ASC`,
-      )
-      .all(),
-    top_rated: db
-      .prepare(
-        `SELECT id, title, platform, rating, cover_url FROM games
-          WHERE rating IS NOT NULL ORDER BY rating DESC, title COLLATE NOCASE ASC LIMIT 10`,
-      )
-      .all(),
-    most_copies: db
-      .prepare(
-        `SELECT id, title, platform, quantity FROM games
-          WHERE quantity > 1 ORDER BY quantity DESC, title COLLATE NOCASE ASC LIMIT 10`,
-      )
-      .all(),
-    recent: db
-      .prepare(
-        'SELECT id, title, platform, cover_url, created_at FROM games ORDER BY id DESC LIMIT 10',
-      )
-      .all(),
+    totals: {
+      total: totals.total,
+      copies: totals.copies,
+      favorites: totals.favorites || 0,
+      incomplete: totals.incomplete || 0,
+    },
   };
 }
 
-export { COLUMNS };
+export { COLUMNS, PARTS };

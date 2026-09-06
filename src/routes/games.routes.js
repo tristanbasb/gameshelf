@@ -2,11 +2,11 @@ import express from 'express';
 import {
   listGames,
   getGame,
+  findByEan,
   createGame,
   updateGame,
   deleteGame,
   getMeta,
-  getStats,
 } from '../games.js';
 
 const router = express.Router();
@@ -18,6 +18,19 @@ const parseId = (value) => {
 
 router.get('/games', (req, res) => {
   res.json(listGames(req.query));
+});
+
+/**
+ * Reponse au scan d'un code-barres : "est-ce que je l'ai deja ?".
+ * Placee avant /games/:id pour ne pas etre capturee par celle-ci.
+ */
+router.get('/lookup', (req, res) => {
+  const games = findByEan(req.query.ean);
+  res.json({
+    ean: String(req.query.ean || '').replace(/[\s-]/g, ''),
+    found: games.length > 0,
+    games,
+  });
 });
 
 router.get('/games/:id', (req, res) => {
@@ -54,10 +67,6 @@ router.delete('/games/:id', (req, res) => {
 
 router.get('/meta', (_req, res) => {
   res.json(getMeta());
-});
-
-router.get('/stats', (_req, res) => {
-  res.json(getStats());
 });
 
 export default router;
