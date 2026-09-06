@@ -63,9 +63,7 @@ export const CONDITION_COLORS = {
   '': 'var(--text-faint)',
 };
 
-export const FORMAT_LABELS = { physical: 'Physique', digital: 'Dématérialisé' };
-
-/** Elements suivis pour un exemplaire physique, dans l'ordre d'affichage. */
+/** Elements suivis dans un exemplaire, dans l'ordre d'affichage. */
 export const PARTS = [
   { key: 'has_box', label: 'Boîte', missing: 'boîte' },
   { key: 'has_cover_art', label: 'Jaquette papier', missing: 'jaquette' },
@@ -73,9 +71,8 @@ export const PARTS = [
   { key: 'has_disc', label: 'Disque / cartouche', missing: 'disque' },
 ];
 
-/** Liste des elements absents d'un exemplaire (vide si complet ou demat). */
+/** Liste des elements absents d'un exemplaire (vide s'il est complet). */
 export function missingParts(game) {
-  if (game.format === 'digital') return [];
   return PARTS.filter((part) => !game[part.key]).map((part) => part.missing);
 }
 

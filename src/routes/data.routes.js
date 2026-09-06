@@ -157,17 +157,6 @@ const CONDITION_ALIASES = {
   poor: 'poor',
 };
 
-const FORMAT_ALIASES = {
-  physique: 'physical',
-  boite: 'physical',
-  physical: 'physical',
-  numerique: 'digital',
-  'numérique': 'digital',
-  demat: 'digital',
-  digital: 'digital',
-  steam: 'digital',
-};
-
 const truthy = (value) =>
   ['1', 'true', 'oui', 'yes', 'x', 'vrai'].includes(String(value ?? '').trim().toLowerCase());
 
@@ -187,10 +176,6 @@ function mapRow(raw) {
   if (row.condition) {
     const key = String(row.condition).trim().toLowerCase();
     row.condition = CONDITION_ALIASES[key] ?? key;
-  }
-  if (row.format) {
-    const key = String(row.format).trim().toLowerCase();
-    row.format = FORMAT_ALIASES[key] || key;
   }
   if (row.favorite !== undefined) row.favorite = truthy(row.favorite) ? 1 : 0;
 

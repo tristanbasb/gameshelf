@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import {
   $, $$, esc, toast, openModal, confirmDialog, debounce, initial, store,
-  CONDITION_LABELS, CONDITION_SHORT, CONDITION_COLORS, FORMAT_LABELS,
+  CONDITION_LABELS, CONDITION_SHORT, CONDITION_COLORS,
   PARTS, missingParts, fmtNumber, fmtDate,
 } from './ui.js';
 
@@ -10,11 +10,10 @@ import {
    ========================================================================== */
 
 const CONDITIONS = ['sealed', 'mint', 'good', 'fair', 'poor'];
-const FORMATS = ['physical', 'digital'];
 
 const state = {
   filters: {
-    search: '', platform: '', condition: '', format: '',
+    search: '', platform: '', condition: '',
     tag: '', favorite: '', incomplete: '',
   },
   sort: 'created_at',
@@ -104,18 +103,6 @@ function renderSidebar() {
     ),
   );
 
-  const formatCounts = new Map((meta.by_format || []).map((r) => [r.label, r.count]));
-  $('#filter-format').replaceChildren(
-    ...FORMATS.map((key) =>
-      filterButton({
-        label: FORMAT_LABELS[key],
-        count: formatCounts.get(key) || 0,
-        active: state.filters.format === key,
-        dataset: { filter: 'format', value: key },
-      }),
-    ),
-  );
-
   const fillList = (selector, items, filterKey, max = 14) => {
     const box = $(selector);
     if (!items.length) {
@@ -171,7 +158,6 @@ const CHIP_LABELS = {
   search: 'Recherche',
   platform: 'Plateforme',
   condition: 'État',
-  format: 'Format',
   tag: 'Tag',
   favorite: 'Favoris',
   incomplete: 'Incomplets',
@@ -188,7 +174,6 @@ function renderChips() {
 
   const shownValue = (key, value) => {
     if (key === 'condition') return CONDITION_LABELS[value] || value;
-    if (key === 'format') return FORMAT_LABELS[value] || value;
     if (key === 'favorite' || key === 'incomplete') return 'oui';
     return value;
   };
@@ -283,7 +268,6 @@ const TABLE_COLUMNS = [
   { key: 'platform', label: 'Plateforme' },
   { key: 'quantity', label: 'Qté' },
   { key: null, label: 'État' },
-  { key: null, label: 'Format' },
   { key: null, label: 'Manque' },
   { key: 'release_year', label: 'Année' },
   { key: 'rating', label: 'Note' },
@@ -322,7 +306,6 @@ function renderTable(items) {
             ${esc(CONDITION_SHORT[game.condition] ?? game.condition)}
           </span>
         </td>
-        <td>${esc(FORMAT_LABELS[game.format] || game.format)}</td>
         <td>${missing.length ? `<span class="missing">${esc(missing.join(', '))}</span>` : '—'}</td>
         <td>${game.release_year ?? '—'}</td>
         <td>${game.rating ?? '—'}</td>
@@ -646,7 +629,7 @@ async function showLookup(code, modal, result, status) {
 const FORM_FIELDS = [
   ['f-title', 'title'], ['f-cover', 'cover_url'], ['f-platform', 'platform'],
   ['f-ean', 'ean'], ['f-quantity', 'quantity'], ['f-condition', 'condition'],
-  ['f-format', 'format'], ['f-developer', 'developer'], ['f-publisher', 'publisher'],
+  ['f-developer', 'developer'], ['f-publisher', 'publisher'],
   ['f-year', 'release_year'], ['f-rating', 'rating'], ['f-purchase', 'purchase_date'],
   ['f-tags', 'tags'], ['f-notes', 'notes'],
 ];
@@ -659,13 +642,6 @@ function openGameModal(game = null, prefill = {}) {
 
   const coverInput = modal.$('#f-cover');
   const updatePreview = () => updateCoverPreview(modal);
-
-  // Les elements de completude n'ont pas de sens pour un jeu dematerialise.
-  const formatSelect = modal.$('#f-format');
-  const syncPartsVisibility = () => {
-    modal.$('#parts-block').hidden = formatSelect.value === 'digital';
-  };
-  formatSelect.addEventListener('change', syncPartsVisibility);
 
   if (isEdit) {
     for (const [id, key] of FORM_FIELDS) {
@@ -702,8 +678,6 @@ function openGameModal(game = null, prefill = {}) {
     }
     if (prefill.ean) modal.$('#f-title').focus();
   }
-
-  syncPartsVisibility();
 
   coverInput.addEventListener('input', debounce(updatePreview, 400));
   modal.$('#btn-clear-cover').addEventListener('click', () => {

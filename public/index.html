@@ -88,11 +88,6 @@
     </div>
 
     <div class="filter-group">
-      <h3>Format</h3>
-      <div class="filter-list" id="filter-format"></div>
-    </div>
-
-    <div class="filter-group">
       <h3>Tags</h3>
       <div class="filter-list" id="filter-tags"></div>
     </div>
@@ -252,14 +247,6 @@
               </select>
             </div>
 
-            <div class="field">
-              <label for="f-format">Format</label>
-              <select class="select" id="f-format" name="format">
-                <option value="physical">Physique</option>
-                <option value="digital">Dématérialisé</option>
-              </select>
-            </div>
-
             <div class="field full" id="parts-block">
               <label>Ce que contient l'exemplaire</label>
               <div class="parts-grid">
@@ -268,7 +255,7 @@
                 <label class="switch"><input type="checkbox" id="f-has_manual" checked><span>Notice</span></label>
                 <label class="switch"><input type="checkbox" id="f-has_disc" checked><span>Disque / cartouche</span></label>
               </div>
-              <span class="hint">Décochez ce qui manque. Un jeu dématérialisé n'est jamais compté comme incomplet.</span>
+              <span class="hint">Décochez ce qui manque : le jeu apparaîtra dans la vue « Incomplets ».</span>
             </div>
 
             <div class="field">
@@ -347,7 +334,7 @@
         <h3 style="font-size:14px; margin-bottom:10px">Importer</h3>
         <p style="color:var(--text-muted); font-size:13px; margin:0 0 12px">
           Fichier CSV ou JSON. La première ligne d'un CSV donne les en-têtes :
-          <code>titre, plateforme, ean, quantité, état, format, boîte, jaquette, notice, disque, année, éditeur, tags, notes</code>
+          <code>titre, plateforme, ean, quantité, état, boîte, jaquette, notice, disque, année, éditeur, tags, notes</code>
           sont reconnus. Pour la complétude, écrivez <code>non</code> ou <code>manquant</code>
           dans la colonne correspondante.
         </p>

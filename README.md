@@ -15,8 +15,8 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 ## Ce que fait l'application
 
 - **Fiche par jeu** : titre, plateforme, code-barres, quantité, état,
-  format (physique / dématérialisé), complétude, développeur, éditeur, année,
-  note, date d'achat, tags, visuel, notes libres, favori.
+  complétude, développeur, éditeur, année, note, date d'achat, tags, visuel,
+  notes libres, favori.
 - **Scan de code-barres** : ouvrez la caméra du téléphone, visez le dos du
   boîtier, et l'application répond immédiatement — soit « ✓ vous l'avez déjà »
   avec la quantité, l'état et les pièces manquantes, soit une proposition
@@ -26,7 +26,7 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
   qui est amputé d'une pièce.
 - **Recherche instantanée** sur le titre, le studio, l'éditeur, les tags, les
   notes et le code-barres.
-- **Filtres** par état, plateforme, format, tag, favoris et incomplets —
+- **Filtres** par état, plateforme, tag, favoris et incomplets —
   combinables, et reflétés dans l'URL.
 - **Deux affichages** : grille de visuels, ou tableau triable colonne par
   colonne. Pagination réglable, avec une option **Tout afficher**.
@@ -175,16 +175,15 @@ La première ligne du CSV donne les en-têtes. Les noms français courants sont
 reconnus :
 
 ```csv
-titre,plateforme,ean,quantité,état,format,boîte,jaquette,notice,disque,année,éditeur,tags,notes
-Chrono Trigger,Super Nintendo,3307210001003,1,comme neuf,physique,oui,oui,oui,oui,1995,Square,collector,Rangé étagère 2
-Tetris,Game Boy,3307210001004,4,correct,physique,non,non,non,oui,1989,Nintendo,,Trois cartouches nues
+titre,plateforme,ean,quantité,état,boîte,jaquette,notice,disque,année,éditeur,tags,notes
+Chrono Trigger,Super Nintendo,3307210001003,1,comme neuf,oui,oui,oui,oui,1995,Square,collector,Rangé étagère 2
+Tetris,Game Boy,3307210001004,4,correct,non,non,non,oui,1989,Nintendo,,Trois cartouches nues
 ```
 
 Conversions automatiques :
 
 - **État** : `neuf`, `sous blister`, `comme neuf`, `TBE`, `bon état`,
   `correct`, `abîmé`…
-- **Format** : `physique`, `démat`, `steam`…
 - **Complétude** : une colonne vide vaut « présent » ; écrivez `non`,
   `manquant` ou `absent` pour signaler une pièce manquante.
 
@@ -253,7 +252,7 @@ sauvegarde, pages statiques) et supprime les données de test qu'il a créées.
 | `GET` | `/api/external/search?q=` | Recherche RAWG (si clé configurée) |
 
 Paramètres de `GET /api/games` : `search`, `ean`, `platform`, `condition`,
-`format`, `tag`, `favorite=1`, `incomplete=1`, `sort`, `dir`, `page`,
+`tag`, `favorite=1`, `incomplete=1`, `sort`, `dir`, `page`,
 `limit` (`limit=all` renvoie toute la collection).
 
 ---

@@ -28,9 +28,8 @@ const migrations = [
 
         quantity      INTEGER NOT NULL DEFAULT 1,
         condition     TEXT    NOT NULL DEFAULT '',
-        format        TEXT    NOT NULL DEFAULT 'physical',
 
-        -- Completude d'un exemplaire physique.
+        -- Completude d'un exemplaire.
         has_box       INTEGER NOT NULL DEFAULT 1,
         has_cover_art INTEGER NOT NULL DEFAULT 1,
         has_manual    INTEGER NOT NULL DEFAULT 1,
@@ -68,9 +67,7 @@ if (currentVersion < migrations.length) {
 /** Etat d'un exemplaire, du meilleur au plus abime. '' = non renseigne. */
 export const CONDITIONS = ['sealed', 'mint', 'good', 'fair', 'poor'];
 
-export const FORMATS = ['physical', 'digital'];
-
-/** Elements dont on suit la presence pour un jeu physique. */
+/** Elements dont on suit la presence dans un exemplaire. */
 export const PARTS = ['has_box', 'has_cover_art', 'has_manual', 'has_disc'];
 
 export default db;

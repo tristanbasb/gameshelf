@@ -1,4 +1,4 @@
-import { db, CONDITIONS, FORMATS, PARTS } from './db.js';
+import { db, CONDITIONS, PARTS } from './db.js';
 
 const MAX_TEXT = 120;
 const MAX_NOTES = 8000;
@@ -94,11 +94,6 @@ export function normalizeGame(input = {}) {
     throw new ValidationError(`Etat invalide (valeurs possibles : ${CONDITIONS.join(', ')})`);
   }
 
-  const format = str(input.format, 20).toLowerCase() || 'physical';
-  if (!FORMATS.includes(format)) {
-    throw new ValidationError(`Format invalide (valeurs possibles : ${FORMATS.join(', ')})`);
-  }
-
   const quantity = optionalNumber(input.quantity, {
     min: 1, max: 9999, integer: true, label: 'Quantite',
   });
@@ -114,7 +109,6 @@ export function normalizeGame(input = {}) {
     ean: normalizeEan(input.ean),
     quantity: quantity ?? 1,
     condition,
-    format,
     rating: optionalNumber(input.rating, { min: 0, max: 10, integer: true, label: 'Note' }),
     purchase_date: optionalDate(input.purchase_date, "Date d'achat"),
     favorite: flag(input.favorite, 0),
@@ -123,10 +117,9 @@ export function normalizeGame(input = {}) {
     tags: normalizeTags(input.tags),
   };
 
-  // Un jeu dematerialise n'a ni boite, ni notice, ni disque : on neutralise
-  // ces champs pour que le calcul d'incomplet ne le signale jamais.
+  // Ce que contient l'exemplaire : present par defaut.
   for (const part of PARTS) {
-    row[part] = format === 'digital' ? 1 : flag(input[part], 1);
+    row[part] = flag(input[part], 1);
   }
 
   return row;
@@ -134,7 +127,7 @@ export function normalizeGame(input = {}) {
 
 const COLUMNS = [
   'title', 'platform', 'developer', 'publisher', 'release_year', 'ean',
-  'quantity', 'condition', 'format', ...PARTS,
+  'quantity', 'condition', ...PARTS,
   'rating', 'purchase_date', 'favorite', 'cover_url', 'notes', 'tags',
 ];
 
@@ -148,8 +141,8 @@ const SORTABLE = {
   updated_at: 'updated_at',
 };
 
-/** Condition SQL : au moins un element manquant sur un exemplaire physique. */
-const INCOMPLETE_SQL = `(format = 'physical' AND (${PARTS.map((p) => `${p} = 0`).join(' OR ')}))`;
+/** Condition SQL : au moins un element manquant dans l'exemplaire. */
+const INCOMPLETE_SQL = `(${PARTS.map((p) => `${p} = 0`).join(' OR ')})`;
 
 export function listGames(query = {}) {
   const where = [];
@@ -174,10 +167,6 @@ export function listGames(query = {}) {
   if (query.condition) {
     where.push('condition = @condition');
     params.condition = String(query.condition);
-  }
-  if (query.format) {
-    where.push('format = @format');
-    params.format = String(query.format);
   }
   if (query.favorite === '1' || query.favorite === true) {
     where.push('favorite = 1');
@@ -320,9 +309,7 @@ export function getMeta() {
       .map(([value, count]) => ({ value, count }))
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
     conditions: CONDITIONS,
-    formats: FORMATS,
     by_condition: groupBy('condition'),
-    by_format: groupBy('format'),
     totals: {
       total: totals.total,
       copies: totals.copies,
