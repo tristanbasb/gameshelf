@@ -332,8 +332,11 @@ label { font-size: 13px; font-weight: 550; color: var(--text-muted); }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 13px;
+  /* Les fiches sans jaquette sont plus courtes : sans cela, elles seraient
+     etirees a la hauteur de la plus haute de leur rangee. */
+  align-items: start;
 }
 
 /*
@@ -384,6 +387,23 @@ label { font-size: 13px; font-weight: 550; color: var(--text-muted); }
   font-size: 30px; font-weight: 700;
   letter-spacing: 0.02em;
 }
+
+/*
+ * Sans jaquette, reserver un bloc portrait revient a afficher un grand
+ * rectangle vide : la fiche se reduit alors a un bandeau, ce qui laisse voir
+ * beaucoup plus de jeux d'un coup. Le format portrait reste la des qu'une
+ * image existe.
+ */
+.card.no-cover .cover {
+  aspect-ratio: auto;
+  height: 44px;
+}
+.card.no-cover .cover-placeholder {
+  font-size: 17px;
+  place-items: center start;
+  padding-left: 11px;
+}
+.card.no-cover { contain-intrinsic-size: auto 158px; }
 
 .fav-btn {
   position: absolute; top: 7px; right: 7px;

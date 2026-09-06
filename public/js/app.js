@@ -231,7 +231,8 @@ function missingBadge(game) {
 
 function gameCard(game) {
   const card = document.createElement('article');
-  card.className = 'card';
+  // Sans jaquette, la fiche adopte une forme compacte (voir .card.no-cover).
+  card.className = game.cover_url ? 'card' : 'card no-cover';
   card.dataset.id = game.id;
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
