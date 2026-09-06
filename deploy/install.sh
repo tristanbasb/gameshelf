@@ -132,6 +132,28 @@ else
 fi
 ok "Dependances installees"
 
+# better-sqlite3 telecharge un binaire compile pendant son script
+# d'installation. Cette etape peut echouer sans acces reseau, ou etre bloquee
+# par les versions recentes de npm. Sans elle, le service demarrerait puis
+# planterait avec un message obscur : on verifie tout de suite.
+info "Verification du module natif SQLite"
+if node -e "require('better-sqlite3')" 2>/dev/null; then
+  ok "Module natif fonctionnel"
+else
+  warn "Binaire absent, nouvelle tentative de construction"
+  npm rebuild better-sqlite3 --no-audit --no-fund || true
+
+  if ! node -e "require('better-sqlite3')" 2>/dev/null; then
+    warn "Compilation depuis les sources (installation des outils necessaires)"
+    apt-get install -y -qq build-essential python3
+    npm rebuild better-sqlite3 --build-from-source --no-audit --no-fund || true
+  fi
+
+  node -e "require('better-sqlite3')" 2>/dev/null \
+    || fail "Le module SQLite reste inutilisable. Verifiez l'acces reseau du serveur, puis relancez ce script."
+  ok "Module natif fonctionnel"
+fi
+
 chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
 
 # ---------------------------------------------------------------------------
