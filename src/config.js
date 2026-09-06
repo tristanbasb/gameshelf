@@ -46,10 +46,27 @@ const dataDir = path.resolve(ROOT, process.env.DATA_DIR || './data');
 fs.mkdirSync(dataDir, { recursive: true });
 fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true });
 
-/** Adresses IPv4 locales, utilisees pour le certificat et les URL affichees. */
+/**
+ * Adresses IPv4 locales, utilisees pour le certificat et les URL affichees.
+ *
+ * L'enumeration passe par une socket netlink, que certains environnements
+ * confinés refusent (un service systemd dont RestrictAddressFamilies omet
+ * AF_NETLINK, par exemple). Ce n'est qu'un confort : mieux vaut demarrer sur
+ * localhost seul que ne pas demarrer du tout.
+ */
 export function localAddresses() {
+  let interfaces;
+  try {
+    interfaces = os.networkInterfaces();
+  } catch (err) {
+    console.warn(`  ! Adresses reseau illisibles (${err.code || err.message}).`);
+    console.warn('    L acces se fera par localhost. Si le service tourne sous');
+    console.warn('    systemd, ajoutez AF_NETLINK a RestrictAddressFamilies.');
+    return [];
+  }
+
   const found = [];
-  for (const list of Object.values(os.networkInterfaces())) {
+  for (const list of Object.values(interfaces)) {
     for (const iface of list || []) {
       if (iface.family === 'IPv4' && !iface.internal) found.push(iface.address);
     }

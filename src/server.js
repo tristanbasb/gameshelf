@@ -199,7 +199,7 @@ app.use((err, _req, res, _next) => {
  * Demarrage
  * ----------------------------------------------------------------------- */
 console.log('');
-console.log('  GameShelf - inventaire de collection de jeux video');
+console.log('  GameVault - inventaire de collection de jeux video');
 
 const credentials = loadOrCreateCertificate();
 const scheme = credentials ? 'https' : 'http';

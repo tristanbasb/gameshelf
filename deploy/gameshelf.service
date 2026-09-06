@@ -1,5 +1,5 @@
 [Unit]
-Description=GameShelf - gestionnaire de collection de jeux video
+Description=GameVault - inventaire de collection de jeux video
 Documentation=https://github.com/
 After=network-online.target
 Wants=network-online.target
@@ -32,7 +32,11 @@ ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# AF_NETLINK est indispensable : c'est par une socket netlink que la libc
+# enumere les interfaces reseau (os.networkInterfaces, utilise pour le
+# certificat local) et que getaddrinfo determine les familles disponibles.
+# Sans elle, le service s'arrete au demarrage sur une erreur EAFNOSUPPORT.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 RestrictNamespaces=true
 LockPersonality=true
 MemoryDenyWriteExecute=false
