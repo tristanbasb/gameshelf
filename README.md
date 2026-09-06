@@ -143,11 +143,39 @@ solutions :
 Dans tous les cas, la **saisie manuelle du code** reste disponible et donne
 exactement la même réponse.
 
+### iPhone : installer le certificat
+
+Safari est plus strict que Chrome : accepter l'avertissement ne suffit pas
+toujours à débloquer la caméra. Installer le certificat règle la question, et
+le plus simple est de le récupérer depuis le téléphone lui-même :
+
+1. Ouvrir `https://<ip-du-serveur>:3000/cert.pem` dans Safari — iOS propose de
+   télécharger un profil de configuration.
+2. **Réglages → Profil téléchargé → Installer**.
+3. **Réglages → Général → Informations → Réglages de confiance des
+   certificats** → activer la confiance pour `GameVault`.
+   *Cette étape est indispensable et facile à oublier : sans elle, le
+   certificat est installé mais pas approuvé.*
+4. Rouvrir `https://<ip-du-serveur>:3000` : plus d'avertissement, et la caméra
+   est autorisée.
+
+La même route sert sur Android, où l'étape 3 se trouve dans
+*Sécurité → Chiffrement → Installer un certificat → Certificat CA*.
+
 ### Compatibilité
 
-La lecture s'appuie sur l'API `BarcodeDetector` du navigateur, disponible sur
-Chrome pour Android. Sur un navigateur qui ne la propose pas (Safari iOS
-notamment), l'application bascule automatiquement sur la saisie manuelle.
+La lecture fonctionne sur tous les navigateurs, par deux chemins :
+
+- **API `BarcodeDetector`** quand le navigateur la fournit — Chrome et Edge.
+  C'est le décodeur du système, le plus rapide.
+- **Décodeur embarqué** partout ailleurs, Safari sur iPhone en particulier.
+  Il s'agit de ZXing, livré avec l'application dans
+  [`public/js/vendor/`](public/js/vendor/) — donc sans accès réseau requis.
+  Ses 350 Ko ne sont téléchargés qu'au premier scan sur ces navigateurs,
+  jamais au démarrage.
+
+Dans les deux cas, la saisie manuelle du code reste disponible et donne la
+même réponse.
 
 Formats lus : EAN-13, EAN-8, UPC-A, UPC-E, Code 128, ITF.
 

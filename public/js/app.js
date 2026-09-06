@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { createBarcodeDetector } from './barcode.js';
 import {
   $, $$, esc, toast, openModal, confirmDialog, debounce, initial, store,
   CONDITION_LABELS, CONDITION_SHORT, CONDITION_COLORS,
@@ -517,8 +518,6 @@ async function refresh({ withMeta = false } = {}) {
    Scanner de codes-barres
    ========================================================================== */
 
-const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'itf'];
-
 /**
  * Ouvre la modale de scan. `onDetect(code)` recoit le code lu ; s'il renvoie
  * true, la modale se ferme. Sans callback, on interroge la collection.
@@ -582,19 +581,18 @@ async function openScanModal({ onDetect } = {}) {
     modal.$('#scan-manual').focus();
     return;
   }
-  if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
+  if (!navigator.mediaDevices?.getUserMedia) {
     status.textContent =
-      'Ce navigateur ne sait pas lire les codes-barres (Chrome sur Android, oui). Saisissez le code à la main.';
+      "Ce navigateur ne donne pas accès à la caméra. Saisissez le code à la main.";
     modal.$('#scanner-frame').hidden = true;
     modal.$('#scan-manual').focus();
     return;
   }
 
   try {
-    const supported = await window.BarcodeDetector.getSupportedFormats();
-    const formats = BARCODE_FORMATS.filter((f) => supported.includes(f));
-    const detector = new window.BarcodeDetector(formats.length ? { formats } : undefined);
-
+    status.textContent = 'Préparation du lecteur…';
+    // La camera est demandee en premier : c'est elle qui declenche la
+    // demande d'autorisation, et le geste de l'utilisateur est encore frais.
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
     });
@@ -604,6 +602,11 @@ async function openScanModal({ onDetect } = {}) {
     }
     video.srcObject = stream;
     await video.play();
+
+    // Safari n'a pas d'API de lecture : createBarcodeDetector retombe alors
+    // sur le decodeur embarque, telecharge a cet instant seulement.
+    const detector = await createBarcodeDetector();
+    if (stopped) return;
     status.textContent = 'Visez le code-barres au dos du boîtier.';
 
     let lastCode = '';

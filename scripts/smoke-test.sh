@@ -171,6 +171,15 @@ check "GET /css/style.css"    "$(status "$BASE_URL/css/style.css")"    "200"
 check "GET /js/app.js"        "$(status "$BASE_URL/js/app.js")"        "200"
 check "GET /page-inexistante" "$(status "$BASE_URL/page-inexistante")" "404"
 
+# Decodeur embarque : sans lui, le scan serait impossible sur Safari.
+check "GET /js/barcode.js"            "$(status "$BASE_URL/js/barcode.js")"            "200"
+check "GET /js/vendor/zxing.min.js"   "$(status "$BASE_URL/js/vendor/zxing.min.js")"   "200"
+
+# Certificat telechargeable, pour l'installer sur un telephone.
+if [[ "$BASE_URL" == https://* ]]; then
+  check "GET /cert.pem" "$(status "$BASE_URL/cert.pem")" "200"
+fi
+
 # --- 10. Invalidation du cache ---------------------------------------------
 # La page doit pointer vers des URL portant une empreinte, et ces URL doivent
 # etre servies. Sans cela, un navigateur garderait l'ancienne interface apres

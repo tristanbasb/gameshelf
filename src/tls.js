@@ -41,7 +41,7 @@ function generate(san) {
       '-days', '3650',
       '-keyout', KEY_FILE,
       '-out', CERT_FILE,
-      '-subj', '/CN=GameShelf',
+      '-subj', '/CN=GameVault',
       '-addext', `subjectAltName=${san}`,
       '-addext', 'basicConstraints=critical,CA:FALSE',
       '-addext', 'keyUsage=digitalSignature,keyEncipherment',

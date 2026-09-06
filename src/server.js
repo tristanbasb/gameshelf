@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { config, localAddresses } from './config.js';
 import { db } from './db.js';
-import { loadOrCreateCertificate } from './tls.js';
+import { loadOrCreateCertificate, CERT_FILE } from './tls.js';
 import { ValidationError } from './games.js';
 import gamesRoutes from './routes/games.routes.js';
 import dataRoutes from './routes/data.routes.js';
@@ -63,6 +63,31 @@ app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
 });
 
+// L'icone est declaree en SVG dans la page, mais les navigateurs sondent
+// malgre tout /favicon.ico. Une reponse vide evite un 404 a chaque visite,
+// dans la console comme dans les journaux du serveur.
+app.get('/favicon.ico', (_req, res) => res.status(204).end());
+
+/*
+ * Certificat local, telechargeable depuis le telephone.
+ *
+ * Safari sur iPhone reste souvent reticent a ouvrir la camera sur un
+ * certificat auto-signe seulement « accepte ». L'installer comme certificat
+ * de confiance leve l'obstacle, et le recuperer depuis l'appareil lui-meme
+ * est de loin le chemin le plus court. Seule la partie publique est servie,
+ * jamais la cle privee.
+ */
+app.get('/cert.pem', (_req, res) => {
+  fs.readFile(CERT_FILE, 'utf8', (err, pem) => {
+    if (err) {
+      return res.status(404).json({ error: 'Aucun certificat local (ENABLE_HTTPS=0 ?)' });
+    }
+    res.setHeader('Content-Type', 'application/x-x509-ca-cert');
+    res.setHeader('Content-Disposition', 'attachment; filename="gamevault.pem"');
+    res.send(pem);
+  });
+});
+
 /* --------------------------------------------------------------------------
  * Invalidation du cache
  *
@@ -76,7 +101,14 @@ app.get('/healthz', (_req, res) => {
  * dossier versionne, sans avoir a reecrire le code servi.
  * ----------------------------------------------------------------------- */
 
-const VERSIONED_ASSETS = ['css/style.css', 'js/app.js', 'js/api.js', 'js/ui.js'];
+const VERSIONED_ASSETS = [
+  'css/style.css',
+  'js/app.js',
+  'js/api.js',
+  'js/ui.js',
+  'js/barcode.js',
+  'js/vendor/zxing.min.js',
+];
 
 function assetVersion() {
   const hash = crypto.createHash('sha1');
