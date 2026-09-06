@@ -1,0 +1,42 @@
+[Unit]
+Description=GameShelf - gestionnaire de collection de jeux video
+Documentation=https://github.com/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+Group=__APP_USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=/usr/bin/node __APP_DIR__/src/server.js
+Environment=NODE_ENV=production
+EnvironmentFile=-__APP_DIR__/.env
+
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# Journalisation
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gameshelf
+
+# Durcissement
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+ReadWritePaths=__APP_DIR__/data
+
+[Install]
+WantedBy=multi-user.target
