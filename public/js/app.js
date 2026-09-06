@@ -131,7 +131,6 @@ function renderSidebar() {
     if (el) el.innerHTML = values.map((v) => `<option value="${esc(v.value)}"></option>`).join('');
   };
   fillDatalist('dl-platforms', meta.platforms);
-  fillDatalist('dl-developers', meta.developers);
 
   // Compteurs et etat actif des vues rapides.
   const totals = meta.totals || {};
@@ -232,7 +231,7 @@ function gameCard(game) {
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', `Modifier ${game.title}`);
 
-  const meta = [game.platform, game.release_year].filter(Boolean).map(esc).join(' · ');
+  const meta = esc(game.platform);
   const missing = missingBadge(game);
 
   card.innerHTML = `
@@ -257,7 +256,6 @@ function gameCard(game) {
           <span class="dot" style="background:${CONDITION_COLORS[game.condition] || 'var(--text-faint)'}"></span>
           ${esc(CONDITION_SHORT[game.condition] ?? game.condition)}
         </span>
-        ${game.rating !== null && game.rating !== undefined ? `<span class="rating-pill">${game.rating}/10</span>` : ''}
       </div>
     </div>`;
   return card;
@@ -269,8 +267,6 @@ const TABLE_COLUMNS = [
   { key: 'quantity', label: 'Qté' },
   { key: null, label: 'État' },
   { key: null, label: 'Manque' },
-  { key: 'release_year', label: 'Année' },
-  { key: 'rating', label: 'Note' },
   { key: null, label: 'Code-barres' },
   { key: 'created_at', label: 'Ajouté le' },
 ];
@@ -307,8 +303,6 @@ function renderTable(items) {
           </span>
         </td>
         <td>${missing.length ? `<span class="missing">${esc(missing.join(', '))}</span>` : '—'}</td>
-        <td>${game.release_year ?? '—'}</td>
-        <td>${game.rating ?? '—'}</td>
         <td style="font-variant-numeric:tabular-nums">${esc(game.ean) || '—'}</td>
         <td>${esc(fmtDate(game.created_at))}</td>
       </tr>`;
@@ -629,8 +623,6 @@ async function showLookup(code, modal, result, status) {
 const FORM_FIELDS = [
   ['f-title', 'title'], ['f-cover', 'cover_url'], ['f-platform', 'platform'],
   ['f-ean', 'ean'], ['f-quantity', 'quantity'], ['f-condition', 'condition'],
-  ['f-developer', 'developer'], ['f-publisher', 'publisher'],
-  ['f-year', 'release_year'], ['f-rating', 'rating'], ['f-purchase', 'purchase_date'],
   ['f-tags', 'tags'], ['f-notes', 'notes'],
 ];
 
@@ -800,9 +792,6 @@ async function runLookup(modal) {
             if (el && value) el.value = value;
           };
           apply('f-title', detail.title);
-          apply('f-year', detail.release_year);
-          apply('f-developer', detail.developer);
-          apply('f-publisher', detail.publisher);
           apply('f-cover', detail.cover_url);
           if (!modal.$('#f-platform').value && detail.platforms?.length) {
             modal.$('#f-platform').value = detail.platforms[0];

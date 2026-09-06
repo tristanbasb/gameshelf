@@ -19,9 +19,6 @@ const migrations = [
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         title         TEXT    NOT NULL,
         platform      TEXT    NOT NULL DEFAULT '',
-        developer     TEXT    NOT NULL DEFAULT '',
-        publisher     TEXT    NOT NULL DEFAULT '',
-        release_year  INTEGER,
 
         -- Code-barres du boitier, utilise pour le scan depuis un telephone.
         ean           TEXT    NOT NULL DEFAULT '',
@@ -35,8 +32,6 @@ const migrations = [
         has_manual    INTEGER NOT NULL DEFAULT 1,
         has_disc      INTEGER NOT NULL DEFAULT 1,
 
-        rating        INTEGER,
-        purchase_date TEXT,
         favorite      INTEGER NOT NULL DEFAULT 0,
         cover_url     TEXT    NOT NULL DEFAULT '',
         notes         TEXT    NOT NULL DEFAULT '',

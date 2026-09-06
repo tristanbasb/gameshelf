@@ -28,7 +28,7 @@
 
   <div class="search-wrap">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input type="search" id="search" class="input" placeholder="Titre, studio, tag, code-barres…" autocomplete="off" aria-label="Rechercher">
+    <input type="search" id="search" class="input" placeholder="Titre, plateforme, tag, code-barres…" autocomplete="off" aria-label="Rechercher">
   </div>
 
   <div class="topbar-actions">
@@ -105,9 +105,6 @@
         <option value="created_at:asc">Ajout ancien</option>
         <option value="title:asc">Titre (A→Z)</option>
         <option value="title:desc">Titre (Z→A)</option>
-        <option value="rating:desc">Meilleure note</option>
-        <option value="release_year:desc">Plus récent</option>
-        <option value="release_year:asc">Plus ancien</option>
         <option value="quantity:desc">Quantité décroissante</option>
         <option value="platform:asc">Plateforme</option>
       </select>
@@ -258,34 +255,8 @@
               <span class="hint">Décochez ce qui manque : le jeu apparaîtra dans la vue « Incomplets ».</span>
             </div>
 
-            <div class="field">
-              <label for="f-developer">Développeur</label>
-              <input class="input" id="f-developer" name="developer" list="dl-developers" autocomplete="off">
-              <datalist id="dl-developers"></datalist>
-            </div>
-
-            <div class="field">
-              <label for="f-publisher">Éditeur</label>
-              <input class="input" id="f-publisher" name="publisher" autocomplete="off">
-            </div>
-
-            <div class="field">
-              <label for="f-year">Année de sortie</label>
-              <input class="input" id="f-year" name="release_year" type="number" min="1950" max="2100" step="1" inputmode="numeric">
-            </div>
-
-            <div class="field">
-              <label for="f-rating">Note sur 10</label>
-              <input class="input" id="f-rating" name="rating" type="number" min="0" max="10" step="1" inputmode="numeric">
-            </div>
-
-            <div class="field">
-              <label for="f-purchase">Date d'achat</label>
-              <input class="input" id="f-purchase" name="purchase_date" type="date">
-            </div>
-
-            <div class="field">
-              <label class="switch" style="margin-top:22px">
+            <div class="field full">
+              <label class="switch">
                 <input type="checkbox" id="f-favorite" name="favorite">
                 <span>Marquer comme favori</span>
               </label>
@@ -334,7 +305,7 @@
         <h3 style="font-size:14px; margin-bottom:10px">Importer</h3>
         <p style="color:var(--text-muted); font-size:13px; margin:0 0 12px">
           Fichier CSV ou JSON. La première ligne d'un CSV donne les en-têtes :
-          <code>titre, plateforme, ean, quantité, état, boîte, jaquette, notice, disque, année, éditeur, tags, notes</code>
+          <code>titre, plateforme, ean, quantité, état, boîte, jaquette, notice, disque, tags, notes</code>
           sont reconnus. Pour la complétude, écrivez <code>non</code> ou <code>manquant</code>
           dans la colonne correspondante.
         </p>

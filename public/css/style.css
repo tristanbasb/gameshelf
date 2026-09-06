@@ -418,12 +418,6 @@ label { font-size: 13px; font-weight: 550; color: var(--text-muted); }
 }
 .badge .dot { width: 6px; height: 6px; }
 
-.rating-pill {
-  margin-left: auto;
-  font-size: 12px; font-weight: 700;
-  color: var(--warning);
-  font-variant-numeric: tabular-nums;
-}
 
 /* --------------------------------------------------------------------------
    Vue tableau

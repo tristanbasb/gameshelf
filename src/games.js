@@ -29,16 +29,6 @@ function optionalNumber(value, { min, max, integer = false, label }) {
   return n;
 }
 
-function optionalDate(value, label) {
-  if (!value) return null;
-  const s = String(value).trim().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    throw new ValidationError(`${label} : format attendu AAAA-MM-JJ`);
-  }
-  if (Number.isNaN(Date.parse(s))) throw new ValidationError(`${label} : date invalide`);
-  return s;
-}
-
 /**
  * Code-barres : on ne garde que les chiffres (les scanners et les copier-coller
  * ajoutent souvent espaces et tirets). Longueurs usuelles : UPC-A 12,
@@ -101,16 +91,9 @@ export function normalizeGame(input = {}) {
   const row = {
     title,
     platform: str(input.platform),
-    developer: str(input.developer),
-    publisher: str(input.publisher),
-    release_year: optionalNumber(input.release_year, {
-      min: 1950, max: 2100, integer: true, label: 'Annee de sortie',
-    }),
     ean: normalizeEan(input.ean),
     quantity: quantity ?? 1,
     condition,
-    rating: optionalNumber(input.rating, { min: 0, max: 10, integer: true, label: 'Note' }),
-    purchase_date: optionalDate(input.purchase_date, "Date d'achat"),
     favorite: flag(input.favorite, 0),
     cover_url: normalizeCoverUrl(input.cover_url),
     notes: str(input.notes, MAX_NOTES),
@@ -126,17 +109,14 @@ export function normalizeGame(input = {}) {
 }
 
 const COLUMNS = [
-  'title', 'platform', 'developer', 'publisher', 'release_year', 'ean',
-  'quantity', 'condition', ...PARTS,
-  'rating', 'purchase_date', 'favorite', 'cover_url', 'notes', 'tags',
+  'title', 'platform', 'ean', 'quantity', 'condition', ...PARTS,
+  'favorite', 'cover_url', 'notes', 'tags',
 ];
 
 const SORTABLE = {
   title: 'title COLLATE NOCASE',
   platform: 'platform COLLATE NOCASE',
   quantity: 'quantity',
-  release_year: 'release_year',
-  rating: 'rating',
   created_at: 'created_at',
   updated_at: 'updated_at',
 };
@@ -150,9 +130,8 @@ export function listGames(query = {}) {
 
   if (query.search) {
     where.push(
-      '(title LIKE @search OR developer LIKE @search OR publisher LIKE @search'
-      + ' OR tags LIKE @search OR notes LIKE @search OR platform LIKE @search'
-      + ' OR ean LIKE @search)',
+      '(title LIKE @search OR platform LIKE @search'
+      + ' OR tags LIKE @search OR notes LIKE @search OR ean LIKE @search)',
     );
     params.search = `%${String(query.search).trim()}%`;
   }
@@ -304,7 +283,6 @@ export function getMeta() {
 
   return {
     platforms: distinct('platform'),
-    developers: distinct('developer'),
     tags: [...tagCounts.entries()]
       .map(([value, count]) => ({ value, count }))
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),

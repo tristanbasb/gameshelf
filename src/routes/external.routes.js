@@ -65,14 +65,10 @@ router.get('/external/game/:id', requireApiKey, async (req, res, next) => {
     const game = await rawgFetch(`/games/${id}`);
     res.json({
       title: game.name || '',
-      release_year: game.released ? Number.parseInt(game.released.slice(0, 4), 10) : null,
       cover_url: game.background_image || '',
-      developer: names(game.developers)[0] || '',
-      publisher: names(game.publishers)[0] || '',
       platforms: (game.platforms || []).map((p) => p?.platform?.name).filter(Boolean),
       // Les genres RAWG servent de suggestion de tags.
       tags: names(game.genres).slice(0, 5).join(', '),
-      metacritic: game.metacritic ?? null,
     });
   } catch (err) {
     next(err);

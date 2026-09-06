@@ -71,7 +71,7 @@ check "GET /api/lookup" "$(status "$BASE_URL/api/lookup?ean=3307210000000")" "20
 
 # --- 4. Creation ------------------------------------------------------------
 create_body="$(curl -sk -H 'Content-Type: application/json' \
-  -d '{"title":"__smoke_test__","platform":"Test","condition":"good","quantity":2,"rating":7,"ean":"3307219999999","has_manual":0}' \
+  -d '{"title":"__smoke_test__","platform":"Test","condition":"good","quantity":2,"ean":"3307219999999","has_manual":0}' \
   "$BASE_URL/api/games")"
 
 CREATED_ID="$(printf '%s' "$create_body" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')"

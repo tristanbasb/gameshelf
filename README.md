@@ -15,8 +15,7 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 ## Ce que fait l'application
 
 - **Fiche par jeu** : titre, plateforme, code-barres, quantité, état,
-  complétude, développeur, éditeur, année, note, date d'achat, tags, visuel,
-  notes libres, favori.
+  complétude, tags, visuel, notes libres, favori.
 - **Scan de code-barres** : ouvrez la caméra du téléphone, visez le dos du
   boîtier, et l'application répond immédiatement — soit « ✓ vous l'avez déjà »
   avec la quantité, l'état et les pièces manquantes, soit une proposition
@@ -24,8 +23,8 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 - **Complétude** : cochez ce que contient l'exemplaire (boîte, jaquette papier,
   notice, disque ou cartouche). La vue **Incomplets** liste d'un coup tout ce
   qui est amputé d'une pièce.
-- **Recherche instantanée** sur le titre, le studio, l'éditeur, les tags, les
-  notes et le code-barres.
+- **Recherche instantanée** sur le titre, la plateforme, les tags, les notes
+  et le code-barres.
 - **Filtres** par état, plateforme, tag, favoris et incomplets —
   combinables, et reflétés dans l'URL.
 - **Deux affichages** : grille de visuels, ou tableau triable colonne par
@@ -175,9 +174,9 @@ La première ligne du CSV donne les en-têtes. Les noms français courants sont
 reconnus :
 
 ```csv
-titre,plateforme,ean,quantité,état,boîte,jaquette,notice,disque,année,éditeur,tags,notes
-Chrono Trigger,Super Nintendo,3307210001003,1,comme neuf,oui,oui,oui,oui,1995,Square,collector,Rangé étagère 2
-Tetris,Game Boy,3307210001004,4,correct,non,non,non,oui,1989,Nintendo,,Trois cartouches nues
+titre,plateforme,ean,quantité,état,boîte,jaquette,notice,disque,tags,notes
+Chrono Trigger,Super Nintendo,3307210001003,1,comme neuf,oui,oui,oui,oui,collector,Rangé étagère 2
+Tetris,Game Boy,3307210001004,4,correct,non,non,non,oui,,Trois cartouches nues
 ```
 
 Conversions automatiques :

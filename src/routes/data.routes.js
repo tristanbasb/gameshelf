@@ -64,12 +64,6 @@ const HEADER_ALIASES = {
   plateforme: 'platform',
   console: 'platform',
   support: 'platform',
-  developpeur: 'developer',
-  studio: 'developer',
-  editeur: 'publisher',
-  annee: 'release_year',
-  year: 'release_year',
-  release: 'release_year',
   etat: 'condition',
   'état': 'condition',
   condition: 'condition',
@@ -79,10 +73,6 @@ const HEADER_ALIASES = {
   exemplaires: 'quantity',
   nombre: 'quantity',
   qty: 'quantity',
-  note: 'rating',
-  score: 'rating',
-  achat: 'purchase_date',
-  date_achat: 'purchase_date',
   favori: 'favorite',
   cover: 'cover_url',
   image: 'cover_url',
@@ -186,8 +176,6 @@ function mapRow(raw) {
     row[part] = falsy(row[part]) ? 0 : 1;
   }
 
-  // Les tableurs francais utilisent souvent la virgule decimale.
-  if (typeof row.rating === 'string') row.rating = row.rating.replace(',', '.');
   return row;
 }
 
