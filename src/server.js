@@ -66,7 +66,22 @@ app.get(['/', '/index.html'], (_req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
-app.use(express.static(publicDir, { index: false, maxAge: '1h', dotfiles: 'ignore' }));
+/*
+ * Les fichiers de l'interface ne sont pas versionnes : un cache ferme
+ * laisserait tourner l'ancienne version apres une mise a jour. On demande
+ * donc une revalidation systematique — l'ETag renvoie un 304 quasi gratuit,
+ * et sur un reseau local le cout est negligeable.
+ */
+app.use(
+  express.static(publicDir, {
+    index: false,
+    maxAge: 0,
+    etag: true,
+    lastModified: true,
+    dotfiles: 'ignore',
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+  }),
+);
 
 /* --------------------------------------------------------------------------
  * API

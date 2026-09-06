@@ -23,7 +23,7 @@
         <rect x="2" y="6" width="20" height="12" rx="5"/>
       </svg>
     </span>
-    <span>GameShelf</span>
+    <span class="brand-label">GameShelf</span>
   </a>
 
   <div class="search-wrap">
@@ -131,6 +131,15 @@
   </main>
 </div>
 
+<!-- Scan au pouce : sur telephone, le geste principal ne doit pas obliger
+     a viser le haut de l'ecran. Masque sur grand ecran. -->
+<button class="fab" id="btn-scan-fab" aria-label="Scanner un code-barres">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+    <path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/>
+  </svg>
+</button>
+
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <!-- ======================= Modale : scan d'un code-barres ======================= -->
@@ -196,21 +205,6 @@
               <div id="lookup-results"></div>
             </div>
 
-            <div class="field full">
-              <label>Visuel</label>
-              <div class="cover-picker">
-                <div class="cover-preview" id="cover-preview">Aucune image</div>
-                <div class="cover-fields">
-                  <input class="input" id="f-cover" name="cover_url" placeholder="https://… ou téléversez un fichier" autocomplete="off">
-                  <div style="display:flex; gap:8px; flex-wrap:wrap">
-                    <button type="button" class="btn" id="btn-upload">Téléverser une image</button>
-                    <button type="button" class="btn btn-ghost" id="btn-clear-cover">Retirer</button>
-                  </div>
-                  <input type="file" id="file-cover" accept="image/*" hidden>
-                </div>
-              </div>
-            </div>
-
             <div class="field">
               <label for="f-platform">Plateforme</label>
               <input class="input" id="f-platform" name="platform" list="dl-platforms" autocomplete="off" placeholder="PS5, Switch, PC…">
@@ -271,12 +265,30 @@
               <label for="f-notes">Notes</label>
               <textarea class="textarea" id="f-notes" name="notes" maxlength="8000" placeholder="État de la boîte, où il est rangé, pièces manquantes…"></textarea>
             </div>
+
+            <div class="field full">
+              <label>Visuel</label>
+              <div class="cover-picker">
+                <div class="cover-preview" id="cover-preview">Aucune image</div>
+                <div class="cover-fields">
+                  <input class="input" id="f-cover" name="cover_url" placeholder="https://… ou téléversez un fichier" autocomplete="off">
+                  <div style="display:flex; gap:8px; flex-wrap:wrap">
+                    <button type="button" class="btn" id="btn-upload">Téléverser une image</button>
+                    <button type="button" class="btn btn-ghost" id="btn-clear-cover">Retirer</button>
+                  </div>
+                  <input type="file" id="file-cover" accept="image/*" hidden>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="modal-foot">
           <button type="button" class="btn btn-danger left" id="btn-delete" hidden>Supprimer</button>
           <button type="button" class="btn" data-close>Annuler</button>
+          <button type="button" class="btn" id="btn-save-again" hidden title="Enregistre et garde la plateforme et l'état pour le jeu suivant">
+            Enregistrer et suivant
+          </button>
           <button type="submit" class="btn btn-primary" id="btn-save">Enregistrer</button>
         </div>
       </form>

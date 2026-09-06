@@ -27,8 +27,13 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
   et le code-barres.
 - **Filtres** par état, plateforme, tag, favoris et incomplets —
   combinables, et reflétés dans l'URL.
+- **Saisie en chaîne** : le bouton **Enregistrer et suivant** garde la fiche
+  ouverte, conserve la plateforme et l'état, vide le reste et replace le
+  curseur sur le titre. Cataloguer une étagère revient à enchaîner
+  titre → Entrée. Ces deux valeurs sont mémorisées d'une session à l'autre.
 - **Deux affichages** : grille de visuels, ou tableau triable colonne par
-  colonne. Pagination réglable, avec une option **Tout afficher**.
+  colonne. Pagination réglable, avec une option **Tout afficher** (400 fiches
+  s'affichent en une vingtaine de millisecondes).
 - **Import / export** CSV et JSON, plus une sauvegarde complète de la base.
 - **Thème sombre / clair**, interface responsive, utilisable au clavier.
 

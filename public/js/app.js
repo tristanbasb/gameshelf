@@ -251,12 +251,13 @@ function gameCard(game) {
       <div class="card-title">${esc(game.title)}</div>
       ${meta ? `<div class="card-meta">${meta}</div>` : ''}
       ${missing ? `<div class="card-meta">${missing}</div>` : ''}
+      ${game.condition ? `
       <div class="card-foot">
         <span class="badge">
           <span class="dot" style="background:${CONDITION_COLORS[game.condition] || 'var(--text-faint)'}"></span>
           ${esc(CONDITION_SHORT[game.condition] ?? game.condition)}
         </span>
-      </div>
+      </div>` : ''}
     </div>`;
   return card;
 }
@@ -381,6 +382,31 @@ function showSkeleton() {
   $('#games-container').replaceChildren(wrap);
 }
 
+/*
+ * Un filtre se met a jour en une quinzaine de millisecondes : afficher un
+ * squelette a chaque interaction produirait un clignotement plus penible que
+ * l'attente elle-meme. On ne montre donc un etat de chargement qu'au-dela de
+ * ce seuil, et on garde la liste precedente a l'ecran, simplement attenuee.
+ */
+const LOADING_DELAY_MS = 180;
+let loadingTimer = null;
+
+function beginLoading() {
+  const container = $('#games-container');
+  const hasContent = Boolean(container.querySelector('.card, table, .empty'));
+  clearTimeout(loadingTimer);
+  loadingTimer = setTimeout(() => {
+    if (hasContent) container.classList.add('is-loading');
+    else showSkeleton();
+  }, LOADING_DELAY_MS);
+}
+
+function endLoading() {
+  clearTimeout(loadingTimer);
+  loadingTimer = null;
+  $('#games-container').classList.remove('is-loading');
+}
+
 async function loadGames() {
   const params = {
     ...Object.fromEntries(Object.entries(state.filters).filter(([, v]) => v)),
@@ -399,6 +425,7 @@ async function loadGames() {
   }
 
   const container = $('#games-container');
+  endLoading();
   if (result.items.length === 0) {
     container.replaceChildren(emptyState());
   } else if (state.view === 'table') {
@@ -431,13 +458,16 @@ async function refresh({ withMeta = false } = {}) {
   writeUrl();
   renderChips();
   renderSidebar();
-  showSkeleton();
+  beginLoading();
   try {
-    if (withMeta) await loadMeta();
-    await loadGames();
+    // Les deux requetes sont independantes : les enchainer doublerait
+    // inutilement la latence a chaque changement de filtre.
+    await Promise.all([withMeta ? loadMeta() : null, loadGames()]);
   } catch (err) {
     $('#games-container').innerHTML =
       `<div class="empty"><h3>Chargement impossible</h3><p>${esc(err.message)}</p></div>`;
+  } finally {
+    endLoading();
   }
 }
 
@@ -546,6 +576,10 @@ async function openScanModal({ onDetect } = {}) {
           status.textContent = `Code lu : ${code}`;
           modal.$('#scan-manual').value = code;
           await handle(code);
+          // On oublie le dernier code au bout de deux secondes : viser a
+          // nouveau la meme boite doit redonner une reponse, sans avoir a
+          // rouvrir la modale.
+          setTimeout(() => { if (lastCode === code) lastCode = ''; }, 2000);
         }
       } catch {
         /* image illisible sur cette frame : on retente */
@@ -600,7 +634,7 @@ async function showLookup(code, modal, result, status) {
             <span class="h-meta">${[
               esc(game.platform),
               `${game.quantity} exemplaire${game.quantity > 1 ? 's' : ''}`,
-              esc(CONDITION_SHORT[game.condition] ?? ''),
+              game.condition ? esc(CONDITION_SHORT[game.condition]) : '',
               missing.length ? `sans ${esc(missing.join(', '))}` : '',
             ].filter(Boolean).join(' · ')}</span>
           </span>`;
@@ -664,11 +698,17 @@ function openGameModal(game = null, prefill = {}) {
       }
     });
   } else {
+    // Cataloguer une etagere, c'est enchainer des jeux de la meme plateforme
+    // et souvent du meme etat : on repart des dernieres valeurs saisies.
+    modal.$('#f-platform').value = store.get('gameshelf-last-platform') || '';
+    modal.$('#f-condition').value = store.get('gameshelf-last-condition') || '';
+
     for (const [key, value] of Object.entries(prefill)) {
       const el = modal.$(`#f-${key}`);
       if (el) el.value = value;
     }
-    if (prefill.ean) modal.$('#f-title').focus();
+    modal.$('#btn-save-again').hidden = false;
+    modal.$('#f-title').focus();
   }
 
   coverInput.addEventListener('input', debounce(updatePreview, 400));
@@ -719,8 +759,7 @@ function openGameModal(game = null, prefill = {}) {
   }
 
   // Enregistrement
-  modal.$('#game-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
+  async function save({ keepOpen = false } = {}) {
     const payload = { favorite: modal.$('#f-favorite').checked ? 1 : 0 };
     for (const [id, key] of FORM_FIELDS) {
       const el = modal.$(`#${id}`);
@@ -735,21 +774,48 @@ function openGameModal(game = null, prefill = {}) {
       return;
     }
 
-    const saveButton = modal.$('#btn-save');
-    saveButton.disabled = true;
-    saveButton.textContent = 'Enregistrement…';
+    const buttons = [modal.$('#btn-save'), modal.$('#btn-save-again')];
+    buttons.forEach((b) => { b.disabled = true; });
+    modal.$('#btn-save').textContent = 'Enregistrement…';
+
     try {
       if (isEdit) await api.updateGame(game.id, payload);
       else await api.createGame(payload);
-      modal.close();
-      toast(isEdit ? 'Jeu mis à jour' : 'Jeu ajouté');
+
+      // Memorise le contexte de saisie pour la fiche suivante.
+      store.set('gameshelf-last-platform', payload.platform);
+      store.set('gameshelf-last-condition', payload.condition);
+
+      if (keepOpen) {
+        // On ne vide que ce qui change d'un jeu a l'autre.
+        for (const id of ['f-title', 'f-ean', 'f-cover', 'f-tags', 'f-notes']) {
+          modal.$(`#${id}`).value = '';
+        }
+        modal.$('#f-quantity').value = '1';
+        modal.$('#f-favorite').checked = false;
+        for (const part of PARTS) modal.$(`#f-${part.key}`).checked = true;
+        updatePreview();
+        modal.$('#lookup-results').innerHTML = '';
+        modal.$('#f-title').focus();
+        toast(`« ${payload.title} » ajouté — au suivant`);
+      } else {
+        modal.close();
+        toast(isEdit ? 'Jeu mis à jour' : 'Jeu ajouté');
+      }
       refresh({ withMeta: true });
     } catch (err) {
       toast(err.message, 'error');
-      saveButton.disabled = false;
-      saveButton.textContent = 'Enregistrer';
+    } finally {
+      buttons.forEach((b) => { b.disabled = false; });
+      modal.$('#btn-save').textContent = 'Enregistrer';
     }
+  }
+
+  modal.$('#game-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    save();
   });
+  modal.$('#btn-save-again').addEventListener('click', () => save({ keepOpen: true }));
 }
 
 async function runLookup(modal) {
@@ -968,13 +1034,21 @@ function bindEvents() {
     const favButton = event.target.closest('[data-fav]');
     if (favButton) {
       event.stopPropagation();
+      // Bascule optimiste : l'etoile repond au clic, on corrige si le serveur
+      // refuse. Attendre l'aller-retour rendrait le geste mou pour rien.
+      const paint = (on) => {
+        favButton.classList.toggle('on', on);
+        favButton.querySelector('svg').setAttribute('fill', on ? 'currentColor' : 'none');
+      };
+      const before = favButton.classList.contains('on');
+      paint(!before);
       try {
         const updated = await api.toggleFavorite(favButton.dataset.fav);
-        favButton.classList.toggle('on', Boolean(updated.favorite));
-        favButton.querySelector('svg').setAttribute('fill', updated.favorite ? 'currentColor' : 'none');
+        paint(Boolean(updated.favorite));
         loadMeta();
         if (state.filters.favorite === '1') refresh();
       } catch (err) {
+        paint(before);
         toast(err.message, 'error');
       }
       return;
@@ -1032,6 +1106,7 @@ function bindEvents() {
 
   // Actions de l'en-tete
   $('#btn-scan').addEventListener('click', () => openScanModal());
+  $('#btn-scan-fab').addEventListener('click', () => openScanModal());
   $('#btn-add').addEventListener('click', () => openGameModal());
   $('#btn-io').addEventListener('click', openIoModal);
   $('#brand-home').addEventListener('click', (event) => {

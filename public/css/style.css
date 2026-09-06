@@ -336,6 +336,17 @@ label { font-size: 13px; font-weight: 550; color: var(--text-muted); }
   gap: 18px;
 }
 
+/*
+ * Chargement : la liste precedente reste a l'ecran, simplement attenuee.
+ * Le squelette n'apparait qu'au premier affichage ou sur une attente longue
+ * (voir LOADING_DELAY_MS dans app.js).
+ */
+#games-container.is-loading {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
 .card {
   position: relative;
   background: var(--surface);
@@ -346,6 +357,11 @@ label { font-size: 13px; font-weight: 550; color: var(--text-muted); }
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
+  /* « Tout afficher » sur plusieurs centaines de jeux : le navigateur ignore
+     la mise en page des cartes hors ecran. La taille annoncee evite que la
+     barre de defilement saute pendant le rendu. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 268px;
 }
 .card:hover {
   transform: translateY(-3px);
@@ -778,8 +794,47 @@ table.games td.title-cell { white-space: normal; font-weight: 550; min-width: 22
    Responsive
    -------------------------------------------------------------------------- */
 
+/* Bouton flottant de scan, telephone uniquement */
+.fab {
+  display: none;
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 46;
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  place-items: center;
+}
+.fab:active { transform: scale(0.94); }
+
 .sidebar-toggle { display: none; }
 .sidebar-backdrop { display: none; }
+
+/* Sur telephone, la recherche passe sur sa propre ligne : elle devenait
+   illisible, coincee entre le menu et quatre boutons. */
+@media (max-width: 700px) {
+  :root { --header-h: 104px; }
+
+  .topbar {
+    height: var(--header-h);
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 9px;
+    padding: 0 12px;
+  }
+  .search-wrap { order: 10; flex: 1 0 100%; max-width: none; }
+  .brand-label { display: none; }
+
+  .fab { display: grid; }
+  /* Laisse respirer la fin de liste au-dessus du bouton flottant. */
+  .main { padding-bottom: 96px; }
+}
 
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
@@ -806,7 +861,9 @@ table.games td.title-cell { white-space: normal; font-weight: 550; min-width: 22
   .grid, .skeleton-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 13px; }
   .form-grid { grid-template-columns: 1fr; }
   .topbar { padding: 0 12px; gap: 10px; }
-  .brand span { display: none; }
+  /* Le libelle seulement : la pastille du logo, elle aussi un <span>,
+     disparaissait avec l'ancienne regle trop large. */
+  .brand-label { display: none; }
   .modal-foot { flex-direction: column-reverse; }
   .modal-foot .btn { width: 100%; justify-content: center; }
   .modal-foot .left { margin-right: 0; }
@@ -820,4 +877,14 @@ table.games td.title-cell { white-space: normal; font-weight: 550; min-width: 22
 @media print {
   .topbar, .sidebar, .toolbar, .pagination { display: none; }
   .layout { grid-template-columns: 1fr; }
+}
+
+/* Respecte le reglage systeme de reduction des animations. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
