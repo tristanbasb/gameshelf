@@ -553,13 +553,30 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 [data-theme="light"] .card-media {
   background: linear-gradient(to bottom right, #eef1f8, #e3e8f4);
 }
-.card-media img {
+.card-media img { display: block; }
+
+/*
+ * La jaquette est affichee en entier (contain) : rien n'est rogne. Le vide
+ * laisse sur les cotes est comble par une copie floutee de la meme image,
+ * ce qui conserve l'aspect pleine vignette sans bandes mortes.
+ */
+.card-media .cover-blur {
+  position: absolute;
+  inset: 0;
   width: 100%; height: 100%;
-  object-fit: cover; object-position: center;
-  display: block;
+  object-fit: cover;
+  filter: blur(22px) saturate(1.2);
+  transform: scale(1.25);
+  opacity: 0.45;
+}
+.card-media .cover-main {
+  position: relative;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  object-position: center top;
   transition: transform 0.3s ease;
 }
-.card:hover .card-media img { transform: scale(1.05); }
+.card:hover .card-media .cover-main { transform: scale(1.04); }
 
 /* Initiale en filigrane, quand aucune jaquette n'est renseignee */
 .watermark {
@@ -576,15 +593,30 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 }
 .card:hover .watermark { color: rgba(139, 92, 246, 0.4); transform: scale(1.1); }
 
-/* Voile qui garantit la lisibilite du texte pose sur la vignette */
+/*
+ * Voile de lisibilite du texte. Il est confine au bas de la fiche : plus il
+ * remonte, plus il mange la jaquette qu'on cherche justement a montrer.
+ */
 .card-scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, var(--bg) 0%, rgba(9, 13, 22, 0.5) 45%, transparent 100%);
+  background: linear-gradient(
+    to top,
+    var(--bg) 0%,
+    rgba(9, 13, 22, 0.82) 20%,
+    rgba(9, 13, 22, 0.35) 38%,
+    transparent 54%
+  );
   pointer-events: none;
 }
 [data-theme="light"] .card-scrim {
-  background: linear-gradient(to top, #ffffff 0%, rgba(255, 255, 255, 0.72) 45%, transparent 100%);
+  background: linear-gradient(
+    to top,
+    #ffffff 0%,
+    rgba(255, 255, 255, 0.88) 20%,
+    rgba(255, 255, 255, 0.4) 38%,
+    transparent 54%
+  );
 }
 
 .card-top {
@@ -871,7 +903,8 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   color: var(--text-faint);
   font-size: 11.5px; text-align: center; padding: 6px;
 }
-.cover-preview img { width: 100%; height: 100%; object-fit: cover; }
+/* Comme sur les fiches : on montre la jaquette en entier, sans la rogner. */
+.cover-preview img { width: 100%; height: 100%; object-fit: contain; }
 .cover-fields { flex: 1; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 
 .suggestions {

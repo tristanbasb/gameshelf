@@ -220,7 +220,12 @@ const STAR_PATH = 'm12 17.3-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.
  */
 function mediaMarkup(game) {
   if (game.cover_url) {
-    return `<img src="${esc(game.cover_url)}" alt="" loading="lazy" data-initial="${esc(initial(game.title))}">`;
+    const src = esc(game.cover_url);
+    // Deux fois la meme image : une copie floutee remplit la fiche, la
+    // seconde s'affiche en entier par-dessus. La jaquette n'est donc jamais
+    // rognee, sans laisser pour autant de bandes vides sur les cotes.
+    return `<img class="cover-blur" src="${src}" alt="" aria-hidden="true" loading="lazy">
+      <img class="cover-main" src="${src}" alt="" loading="lazy" data-initial="${esc(initial(game.title))}">`;
   }
   return `<span class="watermark">${esc(initial(game.title))}</span>`;
 }
@@ -1079,6 +1084,12 @@ function bindEvents() {
       if (!(img instanceof HTMLImageElement)) return;
       if (img.classList.contains('mini-cover')) {
         img.removeAttribute('src');
+        return;
+      }
+      // La copie floutee disparait sans bruit ; c'est l'image principale qui
+      // laisse la place a l'initiale du titre.
+      if (img.classList.contains('cover-blur')) {
+        img.remove();
         return;
       }
       const watermark = document.createElement('span');
