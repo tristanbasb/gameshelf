@@ -1,4 +1,4 @@
-# GameShelf
+# GameVault
 
 Inventaire **100 % local** pour une collection de jeux vidéo : quels jeux vous
 possédez, **en combien d'exemplaires**, **dans quel état**, et **ce qui manque**
@@ -9,6 +9,9 @@ seule question qui compte : « est-ce que je l'ai déjà ? »
 
 Pas de compte, pas de mot de passe, pas de nom de domaine, aucun service
 externe : un serveur Node.js et un fichier SQLite sur votre réseau.
+
+> Le dépôt, le service systemd et la base gardent leur nom technique
+> `gameshelf` : les renommer casserait les installations déjà en place.
 
 ---
 
@@ -42,15 +45,15 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 | Valeur stockée | Libellé            |
 |----------------|--------------------|
 | `sealed`       | Neuf, sous blister |
-| `mint`         | Comme neuf         |
-| `good`         | Bon état           |
-| `fair`         | État correct       |
-| `poor`         | Abîmé              |
+| `mint`         | Très bon           |
+| `good`         | Bon                |
+| `fair`         | Acceptable         |
+| `poor`         | Mauvais            |
 | *(vide)*       | Non renseigné      |
 
 ### Raccourcis clavier
 
-`s` scanner · `n` nouveau jeu · `/` recherche · `Échap` fermer / vider
+`Ctrl+K` ou `/` recherche · `s` scanner · `n` nouveau jeu · `Échap` fermer / vider
 
 ---
 
@@ -110,7 +113,7 @@ réseau Wi-Fi) et touchez **Scanner**.
 ### Le certificat
 
 > Les navigateurs **réservent l'accès à la caméra aux connexions sécurisées**.
-> Sans nom de domaine, impossible d'obtenir un certificat public : GameShelf
+> Sans nom de domaine, impossible d'obtenir un certificat public : GameVault
 > génère donc au premier démarrage un certificat auto-signé couvrant l'adresse
 > IP locale de la machine.
 

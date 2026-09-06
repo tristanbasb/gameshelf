@@ -209,62 +209,80 @@ function renderChips() {
    Rendu des jeux
    ========================================================================== */
 
+const STAR_PATH = 'm12 17.3-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z';
+
 /**
- * Visuel d'une carte. Les images cassees sont remplacees par l'initiale du
- * titre : l'evenement `error` est capture au niveau du conteneur (voir
- * bindEvents), car un handler inline serait bloque par la CSP.
+ * Fond d'une fiche : la jaquette si elle existe, sinon l'initiale du titre en
+ * filigrane. Les images cassees retombent sur ce filigrane, l'evenement
+ * `error` etant capture au niveau du conteneur (voir bindEvents) — un
+ * gestionnaire en ligne serait bloque par la CSP.
  */
-function coverMarkup(game) {
+function mediaMarkup(game) {
   if (game.cover_url) {
     return `<img src="${esc(game.cover_url)}" alt="" loading="lazy" data-initial="${esc(initial(game.title))}">`;
   }
-  return `<div class="cover-placeholder">${esc(initial(game.title))}</div>`;
+  return `<span class="watermark">${esc(initial(game.title))}</span>`;
 }
 
-function missingBadge(game) {
+/** Pastille de completude, en haut a gauche de la fiche. */
+function completenessTag(game) {
   const missing = missingParts(game);
-  if (missing.length === 0) return '';
-  return `<span class="missing" title="Éléments manquants : ${esc(missing.join(', '))}">
-    sans ${esc(missing.join(', '))}
-  </span>`;
+  if (missing.length === 0) {
+    return `<span class="tag tag-ok">
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      Complet</span>`;
+  }
+  return `<span class="tag tag-missing" title="Éléments manquants : ${esc(missing.join(', '))}">sans ${esc(missing.join(', '))}</span>`;
 }
 
 function gameCard(game) {
   const card = document.createElement('article');
-  // Sans jaquette, la fiche adopte une forme compacte (voir .card.no-cover).
-  card.className = game.cover_url ? 'card' : 'card no-cover';
+  card.className = 'card';
   card.dataset.id = game.id;
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', `Modifier ${game.title}`);
 
-  const meta = [game.platform, game.region].filter(Boolean).map(esc).join(' · ');
-  const missing = missingBadge(game);
+  const favLabel = game.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris';
+  const condition = game.condition
+    ? `<span class="tag tag-cond" style="--cond:${CONDITION_COLORS[game.condition]}">
+         <span class="dot" style="background:${CONDITION_COLORS[game.condition]}"></span>
+         ${esc(CONDITION_SHORT[game.condition])}
+       </span>`
+    : '<span class="tag" style="color:var(--text-faint)">État non renseigné</span>';
 
   card.innerHTML = `
-    <div class="cover">
-      ${coverMarkup(game)}
-      ${game.quantity > 1 ? `<span class="qty-badge" title="${game.quantity} exemplaires">×${game.quantity}</span>` : ''}
-      <button class="fav-btn${game.favorite ? ' on' : ''}" data-fav="${game.id}"
-              title="${game.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}"
-              aria-label="${game.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="${game.favorite ? 'currentColor' : 'none'}"
-             stroke="currentColor" stroke-width="2" stroke-linejoin="round">
-          <path d="m12 17.3-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/>
-        </svg>
-      </button>
+    <div class="card-media">
+      ${mediaMarkup(game)}
+      <div class="card-scrim"></div>
     </div>
-    <div class="card-body">
-      <div class="card-title">${esc(game.title)}</div>
-      ${meta ? `<div class="card-meta">${meta}</div>` : ''}
-      ${missing ? `<div class="card-meta">${missing}</div>` : ''}
-      ${game.condition ? `
+
+    <div class="card-top">
+      ${completenessTag(game)}
+      <span style="display:flex;gap:5px;flex:none">
+        ${game.quantity > 1 ? `<span class="tag tag-qty" title="${game.quantity} exemplaires">×${game.quantity}</span>` : ''}
+        ${game.region ? `<span class="tag tag-region">${esc(game.region)}</span>` : ''}
+      </span>
+    </div>
+
+    <div class="card-bottom">
+      <div>
+        <h3 class="card-title" title="${esc(game.title)}">${esc(game.title)}</h3>
+        <p class="card-sub">
+          <span>${esc(game.platform) || 'Plateforme inconnue'}</span>
+          ${game.serial ? `<span class="sep">•</span><span>${esc(game.serial)}</span>` : ''}
+        </p>
+      </div>
       <div class="card-foot">
-        <span class="badge">
-          <span class="dot" style="background:${CONDITION_COLORS[game.condition] || 'var(--text-faint)'}"></span>
-          ${esc(CONDITION_SHORT[game.condition] ?? game.condition)}
-        </span>
-      </div>` : ''}
+        ${condition}
+        <button class="fav-btn${game.favorite ? ' on' : ''}" data-fav="${game.id}"
+                title="${favLabel}" aria-label="${favLabel}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="${game.favorite ? 'currentColor' : 'none'}"
+               stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+            <path d="${STAR_PATH}"/>
+          </svg>
+        </button>
+      </div>
     </div>`;
   return card;
 }
@@ -371,7 +389,8 @@ function renderPagination(result) {
     button.disabled = disabled;
     button.addEventListener('click', () => {
       state.page = page;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // C'est la zone catalogue qui defile, pas la fenetre.
+      $('#catalog').scrollTo({ top: 0, behavior: 'smooth' });
       refresh();
     });
     return button;
@@ -450,13 +469,23 @@ async function loadGames() {
     container.replaceChildren(grid);
   }
 
-  const titles = `${fmtNumber(result.total)} titre${result.total > 1 ? 's' : ''}`;
   $('#result-count').textContent =
-    result.total === 0
-      ? 'Aucun jeu'
-      : result.copies > result.total
-        ? `${titles} · ${fmtNumber(result.copies)} exemplaires`
-        : titles;
+    result.total === 0 ? 'Aucun jeu' : `${fmtNumber(result.total)} titre${result.total > 1 ? 's' : ''}`;
+
+  // Sous-titre : la plateforme filtree, ou l'unique plateforme de la
+  // collection quand il n'y en a qu'une.
+  const onlyPlatform = state.meta?.platforms?.length === 1 ? state.meta.platforms[0].value : '';
+  const sub = state.filters.platform || onlyPlatform;
+  const subEl = $('#result-sub');
+  subEl.textContent = sub;
+  subEl.hidden = !sub;
+
+  // La pastille ne s'affiche que si elle apprend quelque chose : des
+  // exemplaires en double.
+  const chip = $('#result-chip');
+  const extra = result.copies > result.total;
+  chip.textContent = extra ? `${fmtNumber(result.copies)} exemplaires` : '';
+  chip.hidden = !extra;
 
   renderPagination(result);
   return result;
@@ -1049,10 +1078,10 @@ function bindEvents() {
         img.removeAttribute('src');
         return;
       }
-      const placeholder = document.createElement('div');
-      placeholder.className = 'cover-placeholder';
-      placeholder.textContent = img.dataset.initial || '?';
-      img.replaceWith(placeholder);
+      const watermark = document.createElement('span');
+      watermark.className = 'watermark';
+      watermark.textContent = img.dataset.initial || '?';
+      img.replaceWith(watermark);
     },
     true,
   );
@@ -1152,6 +1181,16 @@ function bindEvents() {
 
   // Raccourcis clavier
   document.addEventListener('keydown', (event) => {
+    // Ctrl+K / Cmd+K atteint la recherche depuis n'importe ou, y compris
+    // depuis un champ de saisie : c'est la convention annoncee dans l'en-tete.
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      const search = $('#search');
+      search.focus();
+      search.select();
+      return;
+    }
+
     if (document.querySelector('.modal-backdrop')) return;
     const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName);
     if (typing && event.key !== 'Escape') return;
@@ -1208,6 +1247,9 @@ async function init() {
 
   try {
     state.instance = await api.config();
+    if (state.instance.version) {
+      $('#app-version').textContent = `v${state.instance.version}`;
+    }
   } catch {
     /* on continue : les appels suivants signaleront le probleme */
   }

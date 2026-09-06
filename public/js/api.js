@@ -1,4 +1,4 @@
-/** Petite couche d'acces a l'API JSON de GameShelf. */
+/** Petite couche d'acces a l'API JSON de GameVault. */
 
 export class ApiError extends Error {
   constructor(message, status) {

@@ -139,9 +139,18 @@ app.use(
  * API
  * ----------------------------------------------------------------------- */
 
+const appVersion = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(config.root, 'package.json'), 'utf8')).version;
+  } catch {
+    return '';
+  }
+})();
+
 /** Capacites de l'instance, lues au demarrage de l'interface. */
 app.get('/api/config', (req, res) => {
   res.json({
+    version: appVersion,
     externalSearch: Boolean(config.rawgApiKey),
     // L'interface previent l'utilisateur quand la camera sera refusee.
     secure: req.secure || req.hostname === 'localhost',

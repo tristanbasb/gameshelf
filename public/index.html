@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>GameShelf — ma collection de jeux</title>
+  <title>GameVault — collection de jeux physiques</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
 </head>
@@ -17,23 +17,24 @@
 
   <a class="brand" href="/" id="brand-home">
     <span class="brand-mark">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/>
         <line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/>
         <rect x="2" y="6" width="20" height="12" rx="5"/>
       </svg>
     </span>
-    <span class="brand-label">GameShelf</span>
+    <span class="brand-label">Game<em>Vault</em><span class="brand-tag">Pro</span></span>
   </a>
 
   <div class="search-wrap">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input type="search" id="search" class="input" placeholder="Titre, plateforme, tag, code-barres…" autocomplete="off" aria-label="Rechercher">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" id="search" class="input" placeholder="Titre, plateforme, tag, code-barres… (Ctrl + K)" autocomplete="off" aria-label="Rechercher">
+    <kbd class="kbd">Ctrl K</kbd>
   </div>
 
   <div class="topbar-actions">
-    <button class="btn btn-primary" id="btn-scan" title="Scanner un code-barres">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <button class="btn btn-primary" id="btn-scan" title="Scanner un code-barres (s)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
         <path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/>
       </svg>
@@ -41,16 +42,18 @@
     </button>
 
     <button class="btn" id="btn-add" title="Ajouter un jeu (n)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       <span class="hide-sm">Ajouter</span>
     </button>
 
+    <span class="topbar-sep" aria-hidden="true"></span>
+
     <button class="btn btn-ghost btn-icon" id="btn-io" title="Import / export" aria-label="Import et export">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
     </button>
 
     <button class="btn btn-ghost btn-icon" id="btn-theme" title="Changer de thème" aria-label="Changer de thème">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" id="icon-theme"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" id="icon-theme"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
     </button>
   </div>
 </header>
@@ -59,8 +62,12 @@
 
 <div class="layout">
   <aside class="sidebar" id="sidebar">
+   <div class="sidebar-inner">
     <div class="filter-group">
-      <h3>Bibliothèque</h3>
+      <h3>
+        <span>Bibliothèque</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+      </h3>
       <div class="filter-list">
         <button class="filter-item active" data-quick="all">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -82,34 +89,54 @@
     </div>
 
     <div class="filter-group">
-      <h3>État</h3>
+      <h3>
+        <span>État</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M7 12h10M10 18h4"/></svg>
+      </h3>
       <div class="filter-list" id="filter-condition"></div>
     </div>
 
     <div class="filter-group">
-      <h3>Plateforme</h3>
+      <h3>
+        <span>Plateforme</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="5"/><path d="M6 11h4M8 9v4"/></svg>
+      </h3>
       <div class="filter-list" id="filter-platform"></div>
     </div>
 
     <div class="filter-group">
-      <h3>Région</h3>
+      <h3>
+        <span>Région</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/></svg>
+      </h3>
       <div class="filter-list" id="filter-region"></div>
     </div>
 
     <div class="filter-group">
-      <h3>Tags</h3>
+      <h3>
+        <span>Tags</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>
+      </h3>
       <div class="filter-list" id="filter-tags"></div>
     </div>
+   </div>
+
+   <div class="sidebar-foot">
+     <span class="live"><span class="dot"></span>Données locales</span>
+     <span class="version" id="app-version"></span>
+   </div>
   </aside>
 
   <main class="main">
-    <div class="chips" id="active-filters"></div>
+    <section class="toolbar">
+      <div class="toolbar-title">
+        <span id="result-count"></span>
+        <span class="sub" id="result-sub" hidden></span>
+        <span class="stat-chip" id="result-chip" hidden></span>
+      </div>
 
-    <div class="toolbar">
-      <span class="result-count" id="result-count"></span>
-      <div class="spacer"></div>
-
-      <select class="select" id="sort" style="width:auto" aria-label="Trier par">
+      <div class="toolbar-actions">
+      <select class="select" id="sort" aria-label="Trier par">
         <option value="created_at:desc">Ajout récent</option>
         <option value="created_at:asc">Ajout ancien</option>
         <option value="title:asc">Titre (A→Z)</option>
@@ -118,7 +145,7 @@
         <option value="platform:asc">Plateforme</option>
       </select>
 
-      <select class="select" id="page-size" style="width:auto" aria-label="Nombre de jeux par page">
+      <select class="select" id="page-size" aria-label="Nombre de jeux par page">
         <option value="60">60 par page</option>
         <option value="120">120 par page</option>
         <option value="240">240 par page</option>
@@ -126,17 +153,21 @@
       </select>
 
       <div class="view-toggle" role="group" aria-label="Mode d'affichage">
-        <button id="view-grid" class="active" title="Grille" aria-label="Vue grille">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <button id="view-grid" class="active" title="Vue grille" aria-label="Vue grille">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
         </button>
-        <button id="view-table" title="Tableau" aria-label="Vue tableau">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        <button id="view-table" title="Vue compacte" aria-label="Vue tableau">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
       </div>
-    </div>
+      </div>
+    </section>
 
-    <div id="games-container" aria-live="polite"></div>
-    <div class="pagination" id="pagination"></div>
+    <section class="catalog" id="catalog">
+      <div class="chips" id="active-filters"></div>
+      <div id="games-container" aria-live="polite"></div>
+      <div class="pagination" id="pagination"></div>
+    </section>
   </main>
 </div>
 
