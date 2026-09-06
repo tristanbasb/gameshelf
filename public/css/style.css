@@ -553,30 +553,24 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 [data-theme="light"] .card-media {
   background: linear-gradient(to bottom right, #eef1f8, #e3e8f4);
 }
-.card-media img { display: block; }
-
 /*
- * La jaquette est affichee en entier (contain) : rien n'est rogne. Le vide
- * laisse sur les cotes est comble par une copie floutee de la meme image,
- * ce qui conserve l'aspect pleine vignette sans bandes mortes.
+ * La jaquette est affichee en entier (contain) : rien n'est rogne. Un retrait
+ * la decolle des bords, ce qui la fait respirer sans la reduire beaucoup.
+ * Ajustez --cover-inset pour la montrer plus grande ou plus petite.
  */
-.card-media .cover-blur {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  filter: blur(22px) saturate(1.2);
-  transform: scale(1.25);
-  opacity: 0.45;
-}
+.card { --cover-inset: 10px; }
+
 .card-media .cover-main {
-  position: relative;
-  width: 100%; height: 100%;
+  display: block;
+  position: absolute;
+  inset: var(--cover-inset);
+  width: calc(100% - var(--cover-inset) * 2);
+  height: calc(100% - var(--cover-inset) * 2);
   object-fit: contain;
   object-position: center top;
   transition: transform 0.3s ease;
 }
-.card:hover .card-media .cover-main { transform: scale(1.04); }
+.card:hover .card-media .cover-main { transform: scale(1.03); }
 
 /* Initiale en filigrane, quand aucune jaquette n'est renseignee */
 .watermark {
