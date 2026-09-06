@@ -2,17 +2,16 @@
 #
 # Verification de bout en bout d'une instance GameShelf demarree.
 #
-#   ./scripts/smoke-test.sh [url] [identifiant] [mot_de_passe]
-#   ./scripts/smoke-test.sh http://localhost:3000 admin 'motdepasse'
+#   ./scripts/smoke-test.sh                          # https://localhost:3000
+#   ./scripts/smoke-test.sh https://192.168.1.20:3000
+#   ./scripts/smoke-test.sh http://localhost:3000
 #
 # Cree un jeu de test, verifie chaque endpoint, puis nettoie derriere lui.
+# L'option -k de curl accepte le certificat local auto-signe.
 #
 set -uo pipefail
 
-BASE_URL="${1:-http://localhost:3000}"
-USERNAME="${2:-admin}"
-PASSWORD="${3:-}"
-COOKIE_JAR="$(mktemp)"
+BASE_URL="${1:-https://localhost:3000}"
 FAILURES=0
 CREATED_ID=""
 
@@ -20,9 +19,8 @@ c_reset=$'\033[0m'; c_green=$'\033[1;32m'; c_red=$'\033[1;31m'; c_blue=$'\033[1;
 
 cleanup() {
   if [[ -n "$CREATED_ID" ]]; then
-    curl -s -b "$COOKIE_JAR" -X DELETE "$BASE_URL/api/games/$CREATED_ID" >/dev/null || true
+    curl -sk -X DELETE "$BASE_URL/api/games/$CREATED_ID" >/dev/null || true
   fi
-  rm -f "$COOKIE_JAR"
 }
 trap cleanup EXIT
 
@@ -36,62 +34,43 @@ check() {
   fi
 }
 
+contains() {
+  local label="$1" haystack="$2" needle="$3"
+  if [[ "$haystack" == *"$needle"* ]]; then
+    printf '%s  PASS%s  %s\n' "$c_green" "$c_reset" "$label"
+  else
+    printf '%s  FAIL%s  %s (motif "%s" absent)\n' "$c_red" "$c_reset" "$label" "$needle"
+    FAILURES=$((FAILURES + 1))
+  fi
+}
+
 # Code HTTP d'une requete
 status() {
-  curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$@"
+  curl -sk -o /dev/null -w '%{http_code}' "$@"
 }
 
 printf '%s==>%s Test de %s\n\n' "$c_blue" "$c_reset" "$BASE_URL"
 
 # --- 1. Le service repond ---------------------------------------------------
 check "GET /healthz" "$(status "$BASE_URL/healthz")" "200"
+contains "/healthz renvoie status=ok" "$(curl -sk "$BASE_URL/healthz")" '"status":"ok"'
 
-health_body="$(curl -s "$BASE_URL/healthz")"
-if [[ "$health_body" == *'"status":"ok"'* ]]; then
-  printf '%s  PASS%s  /healthz renvoie status=ok\n' "$c_green" "$c_reset"
+# --- 2. Contexte securise (necessaire au scan par camera) -------------------
+if [[ "$BASE_URL" == https://* ]]; then
+  printf '%s  PASS%s  servi en HTTPS : le scan par camera sera autorise\n' "$c_green" "$c_reset"
 else
-  printf '%s  FAIL%s  /healthz : reponse inattendue (%s)\n' "$c_red" "$c_reset" "$health_body"
-  FAILURES=$((FAILURES + 1))
+  printf '  note   servi en HTTP : la camera sera refusee sur un telephone\n'
+  printf '         (saisie manuelle du code uniquement)\n'
 fi
 
-# --- 2. Les routes protegees le sont ----------------------------------------
-auth_disabled=0
-anon_status="$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/api/games")"
-if [[ "$anon_status" == "200" ]]; then
-  echo "  note   /api/games accessible sans session : DISABLE_AUTH=1 sur cette instance"
-  auth_disabled=1
-else
-  check "GET /api/games sans session -> 401" "$anon_status" "401"
-fi
-
-# --- 3. Connexion -----------------------------------------------------------
-if [[ $auth_disabled -eq 0 ]]; then
-  if [[ -z "$PASSWORD" ]]; then
-    printf '\n%s  !%s  Aucun mot de passe fourni : les tests authentifies sont ignores.\n' "$c_red" "$c_reset"
-    echo "     Relancez avec : $0 $BASE_URL $USERNAME '<mot_de_passe>'"
-    exit $(( FAILURES > 0 ? 1 : 0 ))
-  fi
-
-  login_code="$(curl -s -o /dev/null -w '%{http_code}' -c "$COOKIE_JAR" \
-    -H 'Content-Type: application/json' \
-    -d "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}" \
-    "$BASE_URL/api/auth/login")"
-  check "POST /api/auth/login" "$login_code" "200"
-
-  if [[ "$login_code" != "200" ]]; then
-    echo
-    echo "  Connexion impossible : verifiez l'identifiant et le mot de passe."
-    exit 1
-  fi
-fi
-
-# --- 4. Lecture -------------------------------------------------------------
+# --- 3. Lecture -------------------------------------------------------------
+check "GET /api/config" "$(status "$BASE_URL/api/config")" "200"
 check "GET /api/games"  "$(status "$BASE_URL/api/games")"  "200"
 check "GET /api/meta"   "$(status "$BASE_URL/api/meta")"   "200"
-check "GET /api/lookup"  "$(status "$BASE_URL/api/lookup?ean=3307210000000")"  "200"
+check "GET /api/lookup" "$(status "$BASE_URL/api/lookup?ean=3307210000000")" "200"
 
-# --- 5. Creation ------------------------------------------------------------
-create_body="$(curl -s -b "$COOKIE_JAR" -H 'Content-Type: application/json' \
+# --- 4. Creation ------------------------------------------------------------
+create_body="$(curl -sk -H 'Content-Type: application/json' \
   -d '{"title":"__smoke_test__","platform":"Test","condition":"good","quantity":2,"rating":7,"ean":"3307219999999","has_manual":0}' \
   "$BASE_URL/api/games")"
 
@@ -104,31 +83,20 @@ else
 fi
 
 if [[ -n "$CREATED_ID" ]]; then
-  check "GET /api/games/:id"    "$(status "$BASE_URL/api/games/$CREATED_ID")" "200"
-  check "PUT /api/games/:id"    "$(status -X PUT -H 'Content-Type: application/json' \
+  check "GET /api/games/:id" "$(status "$BASE_URL/api/games/$CREATED_ID")" "200"
+  check "PUT /api/games/:id" "$(status -X PUT -H 'Content-Type: application/json' \
     -d '{"title":"__smoke_test__","condition":"mint","quantity":3}' "$BASE_URL/api/games/$CREATED_ID")" "200"
-  check "POST favori"           "$(status -X POST "$BASE_URL/api/games/$CREATED_ID/favorite")" "200"
+  check "POST favori"        "$(status -X POST "$BASE_URL/api/games/$CREATED_ID/favorite")" "200"
 
   # Le jeu cree porte un code-barres et une notice manquante : on verifie que
   # le scan le retrouve et que le filtre "incomplets" le remonte.
-  lookup_body="$(curl -s -b "$COOKIE_JAR" "$BASE_URL/api/lookup?ean=3307219999999")"
-  if [[ "$lookup_body" == *'"found":true'* ]]; then
-    printf '%s  PASS%s  /api/lookup retrouve le jeu par son code-barres\n' "$c_green" "$c_reset"
-  else
-    printf '%s  FAIL%s  /api/lookup : %s\n' "$c_red" "$c_reset" "$lookup_body"
-    FAILURES=$((FAILURES + 1))
-  fi
-
-  incomplete_body="$(curl -s -b "$COOKIE_JAR" "$BASE_URL/api/games?incomplete=1&search=__smoke_test__")"
-  if [[ "$incomplete_body" == *'__smoke_test__'* ]]; then
-    printf '%s  PASS%s  filtre incomplete=1 remonte le jeu sans notice\n' "$c_green" "$c_reset"
-  else
-    printf '%s  FAIL%s  filtre incomplete=1 : jeu non trouve\n' "$c_red" "$c_reset"
-    FAILURES=$((FAILURES + 1))
-  fi
+  contains "/api/lookup retrouve le jeu par son code-barres" \
+    "$(curl -sk "$BASE_URL/api/lookup?ean=3307219999999")" '"found":true'
+  contains "filtre incomplete=1 remonte le jeu sans notice" \
+    "$(curl -sk "$BASE_URL/api/games?incomplete=1&search=__smoke_test__")" '__smoke_test__'
 fi
 
-# --- 6. Validation des entrees ---------------------------------------------
+# --- 5. Validation des entrees ---------------------------------------------
 check "POST sans titre -> 400" "$(status -H 'Content-Type: application/json' \
   -d '{"title":""}' "$BASE_URL/api/games")" "400"
 check "POST etat invalide -> 400" "$(status -H 'Content-Type: application/json' \
@@ -140,33 +108,32 @@ check "POST code-barres invalide -> 400" "$(status -H 'Content-Type: application
 check "GET jeu inexistant -> 404" "$(status "$BASE_URL/api/games/99999999")" "404"
 check "GET tout afficher (limit=all)" "$(status "$BASE_URL/api/games?limit=all")" "200"
 
-# --- 7. Export --------------------------------------------------------------
+# --- 6. Export --------------------------------------------------------------
 check "GET /api/export?format=csv"  "$(status "$BASE_URL/api/export?format=csv")"  "200"
 check "GET /api/export?format=json" "$(status "$BASE_URL/api/export?format=json")" "200"
 check "GET /api/backup"             "$(status "$BASE_URL/api/backup")"             "200"
 
-# --- 8. Import --------------------------------------------------------------
-import_code="$(status -H 'Content-Type: application/json' \
+# --- 7. Import --------------------------------------------------------------
+check "POST /api/import" "$(status -H 'Content-Type: application/json' \
   -d '{"format":"csv","mode":"merge","content":"titre,plateforme,quantite,etat,notice,ean\n__smoke_import__,Test,2,bon etat,non,3307218888888\n"}' \
-  "$BASE_URL/api/import")"
-check "POST /api/import" "$import_code" "200"
+  "$BASE_URL/api/import")" "200"
 
-imported_id="$(curl -s -b "$COOKIE_JAR" "$BASE_URL/api/games?search=__smoke_import__" \
+imported_id="$(curl -sk "$BASE_URL/api/games?search=__smoke_import__" \
   | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)"
 if [[ -n "$imported_id" ]]; then
-  curl -s -b "$COOKIE_JAR" -X DELETE "$BASE_URL/api/games/$imported_id" >/dev/null
+  curl -sk -X DELETE "$BASE_URL/api/games/$imported_id" >/dev/null
 fi
 
-# --- 9. Suppression ---------------------------------------------------------
+# --- 8. Suppression ---------------------------------------------------------
 if [[ -n "$CREATED_ID" ]]; then
   check "DELETE /api/games/:id" "$(status -X DELETE "$BASE_URL/api/games/$CREATED_ID")" "200"
   CREATED_ID=""
 fi
 
-# --- 10. Pages --------------------------------------------------------------
-check "GET / (page app)"      "$(status "$BASE_URL/")"            "200"
-check "GET /css/style.css"    "$(status "$BASE_URL/css/style.css")" "200"
-check "GET /js/app.js"        "$(status "$BASE_URL/js/app.js")"     "200"
+# --- 9. Pages ---------------------------------------------------------------
+check "GET / (page app)"      "$(status "$BASE_URL/")"                 "200"
+check "GET /css/style.css"    "$(status "$BASE_URL/css/style.css")"    "200"
+check "GET /js/app.js"        "$(status "$BASE_URL/js/app.js")"        "200"
 check "GET /page-inexistante" "$(status "$BASE_URL/page-inexistante")" "404"
 
 echo

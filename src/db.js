@@ -15,21 +15,6 @@ db.pragma('busy_timeout = 5000');
 const migrations = [
   function initialSchema() {
     db.exec(`
-      CREATE TABLE users (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
-        password_hash TEXT NOT NULL,
-        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-
-      CREATE TABLE sessions (
-        token_hash TEXT PRIMARY KEY,
-        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        expires_at TEXT NOT NULL
-      );
-      CREATE INDEX idx_sessions_user ON sessions(user_id);
-
       CREATE TABLE games (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         title         TEXT    NOT NULL,

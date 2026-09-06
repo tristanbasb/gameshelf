@@ -21,12 +21,6 @@ async function request(url, options = {}) {
     },
   });
 
-  // Session expiree : on renvoie l'utilisateur vers la page de connexion.
-  if (response.status === 401 && !url.includes('/api/auth/')) {
-    window.location.href = '/login';
-    throw new ApiError('Session expiree', 401);
-  }
-
   if (response.status === 204) return null;
 
   const isJson = (response.headers.get('content-type') || '').includes('application/json');
@@ -56,18 +50,7 @@ export const api = {
   put: withBody('PUT'),
   del: (url) => request(url, { method: 'DELETE' }),
 
-  me: () => request('/api/auth/me'),
-  login: (username, password) =>
-    request('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    }),
-  logout: () => request('/api/auth/logout', { method: 'POST' }),
-  changePassword: (currentPassword, newPassword) =>
-    request('/api/auth/password', {
-      method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword }),
-    }),
+  config: () => request('/api/config'),
 
   listGames: (params) => request(`/api/games?${new URLSearchParams(params)}`),
   createGame: (data) => withBody('POST')('/api/games', data),

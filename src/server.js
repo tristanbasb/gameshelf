@@ -1,16 +1,11 @@
 import express from 'express';
-import cookieParser from 'cookie-parser';
+import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
-import { config } from './config.js';
+import { config, localAddresses } from './config.js';
 import { db } from './db.js';
-import {
-  attachUser,
-  requireAuth,
-  ensureAdminUser,
-  purgeExpiredSessions,
-} from './auth.js';
+import { loadOrCreateCertificate } from './tls.js';
 import { ValidationError } from './games.js';
-import authRoutes from './routes/auth.routes.js';
 import gamesRoutes from './routes/games.routes.js';
 import dataRoutes from './routes/data.routes.js';
 import externalRoutes from './routes/external.routes.js';
@@ -18,7 +13,6 @@ import externalRoutes from './routes/external.routes.js';
 const publicDir = path.join(config.root, 'public');
 const app = express();
 
-if (config.trustProxy) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 /* --------------------------------------------------------------------------
@@ -49,8 +43,6 @@ app.use((_req, res, next) => {
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
-app.use(cookieParser());
-app.use(attachUser);
 
 /* --------------------------------------------------------------------------
  * Fichiers statiques
@@ -69,15 +61,7 @@ app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
 });
 
-// Page de connexion : accessible sans session.
-app.get(['/login', '/login.html'], (req, res) => {
-  if (req.user) return res.redirect('/');
-  res.sendFile(path.join(publicDir, 'login.html'));
-});
-
-// Application : necessite une session valide.
-app.get(['/', '/index.html'], (req, res) => {
-  if (!req.user) return res.redirect('/login');
+app.get(['/', '/index.html'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(publicDir, 'index.html'));
 });
@@ -87,10 +71,19 @@ app.use(express.static(publicDir, { index: false, maxAge: '1h', dotfiles: 'ignor
 /* --------------------------------------------------------------------------
  * API
  * ----------------------------------------------------------------------- */
-app.use('/api/auth', authRoutes);
-app.use('/api', requireAuth, gamesRoutes);
-app.use('/api', requireAuth, dataRoutes);
-app.use('/api', requireAuth, externalRoutes);
+
+/** Capacites de l'instance, lues au demarrage de l'interface. */
+app.get('/api/config', (req, res) => {
+  res.json({
+    externalSearch: Boolean(config.rawgApiKey),
+    // L'interface previent l'utilisateur quand la camera sera refusee.
+    secure: req.secure || req.hostname === 'localhost',
+  });
+});
+
+app.use('/api', gamesRoutes);
+app.use('/api', dataRoutes);
+app.use('/api', externalRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Route inconnue' });
@@ -129,35 +122,37 @@ app.use((err, _req, res, _next) => {
 /* --------------------------------------------------------------------------
  * Demarrage
  * ----------------------------------------------------------------------- */
-const created = ensureAdminUser();
-purgeExpiredSessions();
-const purgeTimer = setInterval(purgeExpiredSessions, 6 * 60 * 60 * 1000);
-purgeTimer.unref();
+console.log('');
+console.log('  GameShelf - inventaire de collection de jeux video');
 
-const server = app.listen(config.port, config.host, () => {
+const credentials = loadOrCreateCertificate();
+const scheme = credentials ? 'https' : 'http';
+const server = credentials
+  ? https.createServer(credentials, app)
+  : http.createServer(app);
+
+server.listen(config.port, config.host, () => {
+  const addresses = localAddresses();
   console.log('');
-  console.log('  GameShelf - gestionnaire de collection de jeux video');
-  console.log(`  Ecoute sur http://${config.host}:${config.port}`);
-  console.log(`  Donnees   : ${config.dataDir}`);
-  console.log(`  Auth      : ${config.disableAuth ? 'DESACTIVEE' : 'activee'}`);
-  console.log(`  RAWG      : ${config.rawgApiKey ? 'configuree' : 'non configuree'}`);
-
-  if (created) {
-    console.log('');
-    console.log('  ------------------------------------------------------------');
-    console.log('   Compte administrateur cree');
-    console.log(`   Identifiant : ${created.username}`);
-    if (created.generated) {
-      console.log(`   Mot de passe : ${created.password}`);
-      console.log('   (genere automatiquement - notez-le, il ne sera plus affiche)');
-    } else {
-      console.log('   Mot de passe : celui defini dans ADMIN_PASSWORD');
+  console.log(`  Sur cette machine : ${scheme}://localhost:${config.port}`);
+  if (addresses.length) {
+    console.log('  Depuis le telephone (meme reseau Wi-Fi) :');
+    for (const address of addresses) {
+      console.log(`     ${scheme}://${address}:${config.port}`);
     }
-    console.log('  ------------------------------------------------------------');
   }
-  if (config.generatedSecret) {
-    console.log('  Note : SESSION_SECRET absent du .env, un secret a ete genere');
-    console.log(`         et stocke dans ${config.dataDir}/.session-secret`);
+  console.log('');
+  console.log(`  Donnees : ${config.dataDir}`);
+
+  if (credentials) {
+    console.log('');
+    console.log('  Le certificat est auto-signe : le navigateur affichera un');
+    console.log('  avertissement a la premiere visite. Acceptez-le une fois,');
+    console.log('  c est ce qui autorise la camera pour le scan.');
+  } else {
+    console.log('');
+    console.log('  ! Mode HTTP : le scan par camera sera refuse par le');
+    console.log('    navigateur du telephone (saisie manuelle uniquement).');
   }
   console.log('');
 });

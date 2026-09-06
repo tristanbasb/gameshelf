@@ -23,7 +23,7 @@ const state = {
   limit: store.get('gameshelf-limit') || '60',
   view: store.get('gameshelf-view') || 'grid',
   meta: null,
-  session: { externalSearch: false, user: null, authDisabled: false },
+  instance: { externalSearch: false, secure: false },
 };
 
 /* ==========================================================================
@@ -514,8 +514,21 @@ async function openScanModal({ onDetect } = {}) {
 
   // --- Disponibilite de la camera -------------------------------------------
   if (!window.isSecureContext) {
-    status.textContent =
-      'La caméra exige une connexion HTTPS (ou localhost). Saisissez le code à la main.';
+    // Sur un reseau local, l'application sert aussi en HTTPS auto-signe : on
+    // propose directement la bonne adresse plutot qu'un message abstrait.
+    // (Uniquement depuis une origine http:, sinon l'URL reconstruite n'a pas
+    // de sens — page ouverte depuis un fichier local, par exemple.)
+    if (window.location.protocol === 'http:') {
+      const secureUrl = `https://${window.location.host}${window.location.pathname}${window.location.search}`;
+      status.innerHTML =
+        'La caméra exige une connexion sécurisée.<br>'
+        + `Ouvrez plutôt <a href="${esc(secureUrl)}">${esc(secureUrl)}</a>`
+        + ' et acceptez l’avertissement de certificat, ou saisissez le code ci-dessous.';
+    } else {
+      status.textContent =
+        'La caméra exige une connexion sécurisée (HTTPS ou localhost). '
+        + 'Saisissez le code ci-dessous.';
+    }
     modal.$('#scanner-frame').hidden = true;
     modal.$('#scan-manual').focus();
     return;
@@ -733,7 +746,7 @@ function openGameModal(game = null, prefill = {}) {
   });
 
   // Recherche en ligne (RAWG), si une cle API est configuree.
-  if (state.session.externalSearch) {
+  if (state.instance.externalSearch) {
     const lookupButton = modal.$('#btn-lookup');
     lookupButton.hidden = false;
     lookupButton.addEventListener('click', () => runLookup(modal));
@@ -910,38 +923,6 @@ function openIoModal() {
 }
 
 /* ==========================================================================
-   Modale : compte
-   ========================================================================== */
-
-function openAccountModal() {
-  const modal = openModal('tpl-account-modal');
-  modal.$('#acc-username').textContent = state.session.user?.username || 'invité';
-
-  if (state.session.authDisabled) {
-    modal.$('#password-form').innerHTML =
-      '<p style="color:var(--text-muted);font-size:14px;margin:0">L’authentification est désactivée sur cette instance (DISABLE_AUTH=1).</p>';
-    modal.$('#btn-logout').hidden = true;
-    return;
-  }
-
-  modal.$('#password-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    try {
-      await api.changePassword(modal.$('#acc-current').value, modal.$('#acc-new').value);
-      toast('Mot de passe mis à jour, reconnexion nécessaire');
-      setTimeout(() => { window.location.href = '/login'; }, 1200);
-    } catch (err) {
-      toast(err.message, 'error');
-    }
-  });
-
-  modal.$('#btn-logout').addEventListener('click', async () => {
-    await api.logout().catch(() => {});
-    window.location.href = '/login';
-  });
-}
-
-/* ==========================================================================
    Theme
    ========================================================================== */
 
@@ -1090,7 +1071,6 @@ function bindEvents() {
   $('#btn-scan').addEventListener('click', () => openScanModal());
   $('#btn-add').addEventListener('click', () => openGameModal());
   $('#btn-io').addEventListener('click', openIoModal);
-  $('#btn-account').addEventListener('click', openAccountModal);
   $('#brand-home').addEventListener('click', (event) => {
     event.preventDefault();
     resetFilters();
@@ -1161,11 +1141,7 @@ async function init() {
   bindEvents();
 
   try {
-    state.session = await api.me();
-    if (!state.session.authenticated && !state.session.authDisabled) {
-      window.location.href = '/login';
-      return;
-    }
+    state.instance = await api.config();
   } catch {
     /* on continue : les appels suivants signaleront le probleme */
   }

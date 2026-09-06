@@ -52,10 +52,6 @@
     <button class="btn btn-ghost btn-icon" id="btn-theme" title="Changer de thème" aria-label="Changer de thème">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" id="icon-theme"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
     </button>
-
-    <button class="btn btn-ghost btn-icon" id="btn-account" title="Compte" aria-label="Compte">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
-    </button>
   </div>
 </header>
 
@@ -370,43 +366,6 @@
       <div class="modal-foot">
         <button type="button" class="btn" data-close>Fermer</button>
         <button type="button" class="btn btn-primary" id="btn-do-import">Importer</button>
-      </div>
-    </div>
-  </div>
-</template>
-
-<!-- ======================= Modale : compte ======================= -->
-<template id="tpl-account-modal">
-  <div class="modal-backdrop" data-close-on-backdrop>
-    <div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="acc-title">
-      <div class="modal-head">
-        <h2 id="acc-title">Mon compte</h2>
-        <button class="btn btn-ghost btn-icon" data-close aria-label="Fermer">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <p style="margin:0 0 20px; color:var(--text-muted); font-size:14px">
-          Connecté en tant que <strong id="acc-username" style="color:var(--text)"></strong>
-        </p>
-
-        <form id="password-form">
-          <h3 style="font-size:14px; margin-bottom:12px">Changer le mot de passe</h3>
-          <div class="field" style="margin-bottom:12px">
-            <label for="acc-current">Mot de passe actuel</label>
-            <input class="input" type="password" id="acc-current" autocomplete="current-password" required>
-          </div>
-          <div class="field" style="margin-bottom:12px">
-            <label for="acc-new">Nouveau mot de passe</label>
-            <input class="input" type="password" id="acc-new" autocomplete="new-password" minlength="8" required>
-            <span class="hint">8 caractères minimum. Toutes les sessions seront déconnectées.</span>
-          </div>
-          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center">Mettre à jour</button>
-        </form>
-      </div>
-      <div class="modal-foot">
-        <button type="button" class="btn btn-danger left" id="btn-logout">Se déconnecter</button>
-        <button type="button" class="btn" data-close>Fermer</button>
       </div>
     </div>
   </div>

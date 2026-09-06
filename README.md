@@ -1,14 +1,14 @@
 # GameShelf
 
-Inventaire auto-hébergé pour une collection de jeux vidéo : quels jeux vous
+Inventaire **100 % local** pour une collection de jeux vidéo : quels jeux vous
 possédez, **en combien d'exemplaires**, **dans quel état**, et **ce qui manque**
 dans la boîte.
 
 Avec un **scan de code-barres depuis le téléphone** pour répondre en rayon à la
 seule question qui compte : « est-ce que je l'ai déjà ? »
 
-Application web légère (Node.js + SQLite, sans étape de build côté client),
-pensée pour tourner sur un petit serveur Ubuntu.
+Pas de compte, pas de mot de passe, pas de nom de domaine, aucun service
+externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 
 ---
 
@@ -27,13 +27,11 @@ pensée pour tourner sur un petit serveur Ubuntu.
 - **Recherche instantanée** sur le titre, le studio, l'éditeur, les tags, les
   notes et le code-barres.
 - **Filtres** par état, plateforme, format, tag, favoris et incomplets —
-  combinables, et reflétés dans l'URL (une vue filtrée se met en marque-page).
+  combinables, et reflétés dans l'URL.
 - **Deux affichages** : grille de visuels, ou tableau triable colonne par
   colonne. Pagination réglable, avec une option **Tout afficher**.
 - **Import / export** CSV et JSON, plus une sauvegarde complète de la base.
 - **Thème sombre / clair**, interface responsive, utilisable au clavier.
-- **Authentification** par session ; compte administrateur créé au premier
-  démarrage.
 
 ### États disponibles
 
@@ -52,82 +50,28 @@ pensée pour tourner sur un petit serveur Ubuntu.
 
 ---
 
-## Le scan depuis le téléphone
+## Installation
 
-Ouvrez simplement l'application dans le navigateur du téléphone et touchez
-**Scanner**.
-
-> **La caméra exige une connexion HTTPS** (ou `localhost`) — c'est une règle des
-> navigateurs, pas de l'application. En HTTP simple, le scan bascule
-> automatiquement sur une saisie manuelle du code. Suivez la procédure nginx +
-> certbot ci-dessous pour obtenir un certificat.
-
-La lecture s'appuie sur l'API `BarcodeDetector` du navigateur, disponible sur
-Chrome pour Android. Sur un navigateur qui ne la propose pas (Safari iOS
-notamment), la saisie manuelle du code reste disponible et donne la même
-réponse.
-
-Formats lus : EAN-13, EAN-8, UPC-A, UPC-E, Code 128, ITF.
-
----
-
-## Déploiement
-
-### Option A — Docker (recommandé)
-
-Prérequis : Docker et le plugin Compose.
-
-```bash
-git clone https://github.com/tristanbasb/gameshelf.git && cd gameshelf
-cp .env.example .env
-```
-
-Renseignez au minimum `ADMIN_PASSWORD` et `SESSION_SECRET` dans `.env` :
-
-```bash
-printf 'SESSION_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env
-```
-
-Puis :
-
-```bash
-mkdir -p data && sudo chown -R 1000:1000 data
-docker compose up -d --build
-```
-
-L'application écoute sur `127.0.0.1:3000`. Pour y accéder depuis le réseau
-local, remplacez le mapping de ports dans `docker-compose.yml` par
-`"3000:3000"` ; pour une exposition publique — et pour le scan par caméra —
-placez un reverse proxy HTTPS devant et gardez `TRUST_PROXY=1`.
-
-```bash
-docker compose logs -f          # suivre les logs
-docker compose restart          # redémarrer
-docker compose down             # arrêter
-docker compose up -d --build    # mettre à jour après un git pull
-```
-
-### Option B — Installation native avec systemd
-
-Le script gère tout : Node.js, utilisateur système dédié, dépendances,
-service systemd et, si vous le demandez, nginx.
+### Sur un serveur Ubuntu
 
 ```bash
 git clone https://github.com/tristanbasb/gameshelf.git && cd gameshelf
 sudo ./deploy/install.sh
 ```
 
-Avec un nom de domaine, un reverse proxy nginx et HTTPS (nécessaire au scan) :
+Le script installe Node.js si besoin, crée un utilisateur système dédié,
+installe le service systemd, génère le certificat local et ouvre le port dans
+`ufw` s'il est actif. À la fin, il affiche les deux adresses à utiliser :
 
-```bash
-sudo ./deploy/install.sh --nginx jeux.mondomaine.fr
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d jeux.mondomaine.fr
+```
+Sur ce serveur   : https://localhost:3000
+Sur le telephone : https://192.168.1.20:3000
 ```
 
-Le script affiche l'identifiant et le mot de passe administrateur à la fin.
-Il est idempotent : relancez-le pour mettre à jour une installation existante
-(`.env` et `data/` sont préservés).
+C'est tout — l'application est directement utilisable, sans connexion.
+
+Le script est idempotent : relancez-le pour mettre à jour (`.env` et `data/`
+sont préservés).
 
 ```bash
 sudo systemctl status gameshelf     # état du service
@@ -136,38 +80,89 @@ sudo systemctl restart gameshelf    # redémarrage
 sudo ./deploy/update.sh             # git pull + sauvegarde + redéploiement
 ```
 
-### Option C — En local, pour tester
+### Avec Docker
 
 ```bash
-npm install
-cp .env.example .env
-npm start
+git clone https://github.com/tristanbasb/gameshelf.git && cd gameshelf
+mkdir -p data && sudo chown -R 1000:1000 data
+docker compose up -d --build
 ```
 
-Puis <http://localhost:3000> — `localhost` étant un contexte sécurisé, le scan
-par caméra fonctionne aussi en local. Le mot de passe administrateur généré
-s'affiche une seule fois dans la console au tout premier démarrage.
+### Sans rien installer, pour essayer
+
+```bash
+npm install && npm start
+```
+
+Puis <https://localhost:3000>.
+
+---
+
+## Le scan depuis le téléphone
+
+Ouvrez `https://<ip-du-serveur>:3000` dans le navigateur du téléphone (même
+réseau Wi-Fi) et touchez **Scanner**.
+
+### Le certificat
+
+> Les navigateurs **réservent l'accès à la caméra aux connexions sécurisées**.
+> Sans nom de domaine, impossible d'obtenir un certificat public : GameShelf
+> génère donc au premier démarrage un certificat auto-signé couvrant l'adresse
+> IP locale de la machine.
+
+À la première visite, le téléphone affichera un avertissement de sécurité.
+C'est attendu. Touchez **Paramètres avancés → Continuer vers le site** : c'est
+cette acceptation qui autorise ensuite la caméra.
+
+Le certificat est stocké dans `data/tls/` et dure 10 ans. Il est régénéré
+automatiquement uniquement si l'adresse IP du serveur change — pensez donc à
+réserver une IP fixe pour la machine dans votre box, sinon l'avertissement
+réapparaîtra à chaque changement d'adresse.
+
+### Si la caméra reste refusée
+
+Certains navigateurs restent stricts avec un certificat auto-signé. Deux
+solutions :
+
+1. **Installer le certificat comme approuvé sur le téléphone** — copiez
+   `data/tls/cert.pem` sur l'appareil et ajoutez-le dans
+   *Paramètres → Sécurité → Chiffrement → Installer un certificat → Certificat
+   CA*. L'avertissement disparaît définitivement.
+2. **Autoriser l'origine dans Chrome** — ouvrez
+   `chrome://flags/#unsafely-treat-insecure-origin-as-secure`, ajoutez
+   `http://192.168.1.20:3000` (avec votre IP), activez, relancez le navigateur.
+   Vous pouvez alors utiliser l'adresse en HTTP simple.
+
+Dans tous les cas, la **saisie manuelle du code** reste disponible et donne
+exactement la même réponse.
+
+### Compatibilité
+
+La lecture s'appuie sur l'API `BarcodeDetector` du navigateur, disponible sur
+Chrome pour Android. Sur un navigateur qui ne la propose pas (Safari iOS
+notamment), l'application bascule automatiquement sur la saisie manuelle.
+
+Formats lus : EAN-13, EAN-8, UPC-A, UPC-E, Code 128, ITF.
 
 ---
 
 ## Configuration
 
-Toutes les options passent par des variables d'environnement (fichier `.env`
-ou environnement systemd/Docker). Voir [`.env.example`](.env.example).
+Tout est optionnel : les valeurs par défaut conviennent à une installation
+locale. Voir [`.env.example`](.env.example).
 
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `PORT` | `3000` | Port d'écoute |
-| `HOST` | `0.0.0.0` | Interface d'écoute (`127.0.0.1` derrière un proxy) |
-| `DATA_DIR` | `./data` | Base SQLite + images téléversées |
-| `ADMIN_USERNAME` | `admin` | Identifiant créé au premier démarrage |
-| `ADMIN_PASSWORD` | *(vide)* | Si vide, un mot de passe aléatoire est généré et affiché dans les logs |
-| `SESSION_SECRET` | *(généré)* | À définir en production (`openssl rand -hex 32`) |
-| `SESSION_DAYS` | `30` | Durée de validité d'une session |
-| `TRUST_PROXY` | `0` | `1` derrière un reverse proxy (X-Forwarded-*) |
-| `DISABLE_AUTH` | `0` | `1` pour supprimer la connexion — réseau privé uniquement |
+| `HOST` | `0.0.0.0` | Interface d'écoute (`0.0.0.0` = accessible depuis le réseau local) |
+| `DATA_DIR` | `./data` | Base SQLite, images et certificat |
+| `ENABLE_HTTPS` | `1` | HTTPS local auto-signé. `0` = HTTP simple, sans scan par caméra |
 | `RAWG_API_KEY` | *(vide)* | Active le pré-remplissage en ligne ([rawg.io/apidocs](https://rawg.io/apidocs)) |
 | `MAX_UPLOAD_MB` | `5` | Taille maximale d'une image |
+
+> **Aucune authentification** : toute personne ayant accès au réseau local peut
+> lire et modifier la collection. C'est le compromis assumé d'une installation
+> domestique. N'exposez pas le port sur Internet.
 
 ---
 
@@ -193,19 +188,16 @@ Conversions automatiques :
 - **Complétude** : une colonne vide vaut « présent » ; écrivez `non`,
   `manquant` ou `absent` pour signaler une pièce manquante.
 
-Deux modes :
-
-- **Ajouter** — les doublons (même titre + même plateforme) sont ignorés ;
-- **Remplacer** — la collection est effacée avant l'import.
-
-Les lignes invalides sont signalées, l'import se poursuit pour les autres.
+Deux modes : **Ajouter** (les doublons titre + plateforme sont ignorés) ou
+**Remplacer** (la collection est effacée avant l'import). Les lignes invalides
+sont signalées, l'import se poursuit pour les autres.
 
 ---
 
 ## Sauvegardes
 
-Les données tiennent dans `data/` : la base `gameshelf.db` et le dossier
-`uploads/`.
+Les données tiennent dans `data/` : la base `gameshelf.db`, le dossier
+`uploads/` et le certificat `tls/`.
 
 Depuis l'interface, **Import / export → Sauvegarde .db** télécharge une copie
 cohérente de la base sans arrêter le service.
@@ -228,22 +220,10 @@ Sauvegarde quotidienne par cron :
 
 ---
 
-## Mot de passe oublié
-
-```bash
-node scripts/reset-password.js                  # compte admin, mot de passe aléatoire
-node scripts/reset-password.js admin 'nouveau'  # mot de passe imposé
-docker compose exec gameshelf node scripts/reset-password.js
-```
-
-Toutes les sessions existantes sont révoquées.
-
----
-
 ## Vérifier une installation
 
 ```bash
-./scripts/smoke-test.sh http://localhost:3000 admin 'votre-mot-de-passe'
+./scripts/smoke-test.sh https://localhost:3000
 ```
 
 Le script teste l'ensemble des routes (lecture, création, modification, scan
@@ -254,16 +234,10 @@ sauvegarde, pages statiques) et supprime les données de test qu'il a créées.
 
 ## API HTTP
 
-Toutes les routes `/api/*` exigent le cookie de session, obtenu via
-`POST /api/auth/login`.
-
 | Méthode | Route | Description |
 |---|---|---|
-| `GET` | `/healthz` | État du service (publique) |
-| `POST` | `/api/auth/login` | Connexion (`{username, password}`) |
-| `POST` | `/api/auth/logout` | Déconnexion |
-| `GET` | `/api/auth/me` | Session courante |
-| `POST` | `/api/auth/password` | Changement de mot de passe |
+| `GET` | `/healthz` | État du service |
+| `GET` | `/api/config` | Capacités de l'instance |
 | `GET` | `/api/games` | Liste filtrée et paginée |
 | `POST` | `/api/games` | Création |
 | `GET` | `/api/games/:id` | Détail |
@@ -290,35 +264,18 @@ Paramètres de `GET /api/games` : `search`, `ean`, `platform`, `condition`,
 src/            serveur Express, accès SQLite, routes
   config.js     lecture de la configuration et du .env
   db.js         schéma et migrations
-  auth.js       sessions, mots de passe, limitation des tentatives
+  tls.js        certificat local auto-signé
   games.js      validation et requêtes sur les jeux
   csv.js        lecture / écriture CSV
-  routes/       auth, jeux, import-export, recherche externe
+  routes/       jeux, import-export, recherche externe
 public/         interface (HTML, CSS, JS natif — aucun build)
-deploy/         install.sh, update.sh, unité systemd, conf nginx
-scripts/        sauvegarde, réinitialisation de mot de passe, smoke-test
+deploy/         install.sh, update.sh, unité systemd
+scripts/        sauvegarde, smoke-test
 ```
 
 Le schéma évolue par migrations incrémentales (`PRAGMA user_version` dans
 `src/db.js`) : ajoutez une fonction à la fin du tableau, ne modifiez jamais les
 précédentes.
-
----
-
-## Sécurité
-
-- Mots de passe hachés en bcrypt (coût 12).
-- Jetons de session aléatoires (32 octets), stockés hachés en SHA-256, révoqués
-  au changement de mot de passe.
-- Cookie `HttpOnly`, `SameSite=Lax`, et `Secure` dès que la requête arrive en HTTPS.
-- Limitation à 10 tentatives de connexion par IP et par quart d'heure.
-- En-têtes `Content-Security-Policy`, `X-Content-Type-Options`,
-  `X-Frame-Options`, `Referrer-Policy`.
-- Requêtes SQL exclusivement paramétrées ; champs de tri sur liste blanche.
-- Le service systemd tourne sous un utilisateur dédié, sans privilèges, avec
-  un accès en écriture limité à `data/`.
-
-Exposé sur Internet, mettez impérativement l'application derrière HTTPS.
 
 ---
 

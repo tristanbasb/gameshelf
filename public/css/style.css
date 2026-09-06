@@ -741,10 +741,10 @@ table.games td.title-cell { white-space: normal; font-weight: 550; min-width: 22
 @keyframes slide-in { from { opacity: 0; transform: translateX(16px); } }
 
 /* --------------------------------------------------------------------------
-   Page de connexion
+   Page centree (404)
    -------------------------------------------------------------------------- */
 
-.login-page {
+.center-page {
   min-height: 100dvh;
   display: grid;
   place-items: center;
@@ -754,7 +754,7 @@ table.games td.title-cell { white-space: normal; font-weight: 550; min-width: 22
     radial-gradient(800px 500px at 100% 110%, rgba(217, 70, 239, 0.14), transparent 60%),
     var(--bg);
 }
-.login-card {
+.center-card {
   width: 100%;
   max-width: 380px;
   background: var(--surface);
@@ -763,13 +763,13 @@ table.games td.title-cell { white-space: normal; font-weight: 550; min-width: 22
   padding: 30px 28px;
   box-shadow: var(--shadow);
 }
-.login-card .brand { justify-content: center; margin-bottom: 6px; font-size: 20px; }
-.login-card .subtitle {
+.center-card .brand { justify-content: center; margin-bottom: 6px; font-size: 20px; }
+.center-card .subtitle {
   text-align: center; color: var(--text-muted);
   font-size: 14px; margin: 0 0 22px;
 }
-.login-card .field { margin-bottom: 14px; }
-.login-card .btn { width: 100%; justify-content: center; padding: 10px; }
+.center-card .field { margin-bottom: 14px; }
+.center-card .btn { width: 100%; justify-content: center; padding: 10px; }
 .form-error {
   background: var(--danger-soft);
   color: var(--danger);

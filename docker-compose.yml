@@ -6,28 +6,20 @@ services:
     restart: unless-stopped
 
     # Le conteneur tourne sous l'utilisateur "node" (uid 1000).
-    # Si vous changez le montage ci-dessous, pensez a :
-    #   sudo chown -R 1000:1000 ./data
+    # Apres un premier lancement : sudo chown -R 1000:1000 ./data
     user: "1000:1000"
 
+    # Accessible depuis le telephone et les autres machines du reseau local.
     ports:
-      # Par defaut on n'expose que sur la boucle locale : mettez un reverse
-      # proxy (nginx / Caddy / Traefik) devant pour le HTTPS.
-      # Pour un acces direct sur le reseau local, remplacez par "3000:3000".
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
 
     environment:
       NODE_ENV: production
       PORT: "3000"
       HOST: 0.0.0.0
       DATA_DIR: /app/data
-      # Renseignez ces valeurs dans le fichier .env (voir .env.example)
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      SESSION_SECRET: ${SESSION_SECRET:-}
-      SESSION_DAYS: ${SESSION_DAYS:-30}
-      TRUST_PROXY: ${TRUST_PROXY:-1}
-      DISABLE_AUTH: ${DISABLE_AUTH:-0}
+      # HTTPS auto-signe : necessaire pour la camera du telephone.
+      ENABLE_HTTPS: ${ENABLE_HTTPS:-1}
       RAWG_API_KEY: ${RAWG_API_KEY:-}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-5}
 
@@ -35,15 +27,12 @@ services:
       - ./data:/app/data
 
     healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      # -k : le certificat local est auto-signe.
+      test: ["CMD-SHELL", "curl -fsk https://127.0.0.1:3000/healthz || curl -fs http://127.0.0.1:3000/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 20s
 
     security_opt:
       - no-new-privileges:true

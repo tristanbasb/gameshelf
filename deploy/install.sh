@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
-# Installation de GameShelf sur un serveur Ubuntu (sans Docker).
+# Installation de GameShelf sur un serveur Ubuntu, pour un usage local.
 #
 #   sudo ./deploy/install.sh
-#   sudo ./deploy/install.sh --nginx jeux.mondomaine.fr
+#   sudo ./deploy/install.sh --port 8080
+#   sudo ./deploy/install.sh --http-only     # sans HTTPS (scan camera indisponible)
 #
 # Le script est idempotent : vous pouvez le relancer pour mettre a jour.
 #
@@ -15,7 +16,7 @@ APP_USER="${APP_NAME}"
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
 NODE_MAJOR=22
 PORT="${PORT:-3000}"
-NGINX_DOMAIN=""
+ENABLE_HTTPS=1
 
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -35,29 +36,17 @@ fail()  { printf '%s  x %s %s\n' "$c_red"    "$c_reset" "$*" >&2; exit 1; }
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --nginx)
-      NGINX_DOMAIN="${2:-}"
-      [[ -n "$NGINX_DOMAIN" ]] || fail "--nginx attend un nom de domaine"
-      shift 2
-      ;;
-    --port)
-      PORT="${2:-3000}"
-      shift 2
-      ;;
-    -h|--help)
-      sed -n '2,12p' "$0"
-      exit 0
-      ;;
-    *)
-      fail "Option inconnue : $1"
-      ;;
+    --port)      PORT="${2:-3000}"; shift 2 ;;
+    --http-only) ENABLE_HTTPS=0; shift ;;
+    -h|--help)   sed -n '2,10p' "$0"; exit 0 ;;
+    *)           fail "Option inconnue : $1" ;;
   esac
 done
 
 [[ $EUID -eq 0 ]] || fail "Ce script doit etre lance avec sudo."
 
 # ---------------------------------------------------------------------------
-# 1. Node.js
+# 1. Node.js et openssl
 # ---------------------------------------------------------------------------
 info "Verification de Node.js"
 need_node=1
@@ -80,6 +69,11 @@ if [[ $need_node -eq 1 ]]; then
   ok "Node.js $(node -v) installe"
 fi
 
+if [[ $ENABLE_HTTPS -eq 1 ]] && ! command -v openssl >/dev/null 2>&1; then
+  info "Installation d'openssl (certificat local)"
+  apt-get install -y -qq openssl
+fi
+
 # ---------------------------------------------------------------------------
 # 2. Utilisateur systeme dedie
 # ---------------------------------------------------------------------------
@@ -98,19 +92,12 @@ info "Copie de l'application vers ${APP_DIR}"
 mkdir -p "$APP_DIR"
 
 if [[ "$SOURCE_DIR" != "$APP_DIR" ]]; then
+  command -v rsync >/dev/null 2>&1 || apt-get install -y -qq rsync
   # --delete nettoie les anciens fichiers, mais data/ et .env sont preserves.
-  if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete \
-      --exclude 'data/' --exclude '.env' --exclude 'node_modules/' \
-      --exclude '.git/' --exclude 'backups/' \
-      "$SOURCE_DIR"/ "$APP_DIR"/
-  else
-    apt-get install -y -qq rsync
-    rsync -a --delete \
-      --exclude 'data/' --exclude '.env' --exclude 'node_modules/' \
-      --exclude '.git/' --exclude 'backups/' \
-      "$SOURCE_DIR"/ "$APP_DIR"/
-  fi
+  rsync -a --delete \
+    --exclude 'data/' --exclude '.env' --exclude 'node_modules/' \
+    --exclude '.git/' --exclude 'backups/' \
+    "$SOURCE_DIR"/ "$APP_DIR"/
 fi
 mkdir -p "$APP_DIR/data/uploads"
 ok "Fichiers en place"
@@ -118,40 +105,18 @@ ok "Fichiers en place"
 # ---------------------------------------------------------------------------
 # 4. Configuration
 # ---------------------------------------------------------------------------
-ADMIN_PASSWORD_GENERATED=""
 if [[ -f "$APP_DIR/.env" ]]; then
   ok "Fichier .env existant conserve"
 else
   info "Generation du fichier .env"
-  session_secret="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  admin_password="$(openssl rand -base64 18 2>/dev/null | tr -d '/+=' | cut -c1-18)"
-  [[ -n "$admin_password" ]] || admin_password="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  ADMIN_PASSWORD_GENERATED="$admin_password"
-
-  # TRUST_PROXY n'a de sens que derriere un reverse proxy : l'activer sans
-  # proxy permettrait a un client de falsifier son adresse via X-Forwarded-For.
-  if [[ -n "$NGINX_DOMAIN" ]]; then
-    trust_proxy=1
-    listen_host=127.0.0.1   # seul nginx doit joindre le service
-  else
-    trust_proxy=0
-    listen_host=0.0.0.0     # acces direct depuis le reseau local
-  fi
-
   cat > "$APP_DIR/.env" <<ENVEOF
 PORT=${PORT}
-HOST=${listen_host}
+HOST=0.0.0.0
 DATA_DIR=${APP_DIR}/data
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=${admin_password}
-SESSION_SECRET=${session_secret}
-SESSION_DAYS=30
-TRUST_PROXY=${trust_proxy}
-DISABLE_AUTH=0
+ENABLE_HTTPS=${ENABLE_HTTPS}
 RAWG_API_KEY=
 MAX_UPLOAD_MB=5
 ENVEOF
-  chmod 600 "$APP_DIR/.env"
   ok "Fichier .env cree"
 fi
 
@@ -180,7 +145,7 @@ sed -e "s|__APP_DIR__|${APP_DIR}|g" \
 systemctl daemon-reload
 systemctl enable "$APP_NAME" >/dev/null 2>&1
 systemctl restart "$APP_NAME"
-sleep 2
+sleep 3
 
 if systemctl is-active --quiet "$APP_NAME"; then
   ok "Service ${APP_NAME} demarre"
@@ -190,51 +155,38 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. nginx (optionnel)
+# 7. Pare-feu (si ufw est actif)
 # ---------------------------------------------------------------------------
-if [[ -n "$NGINX_DOMAIN" ]]; then
-  info "Configuration de nginx pour ${NGINX_DOMAIN}"
-  command -v nginx >/dev/null 2>&1 || apt-get install -y -qq nginx
-
-  sed -e "s|__DOMAIN__|${NGINX_DOMAIN}|g" \
-      -e "s|__PORT__|${PORT}|g" \
-      "$APP_DIR/deploy/nginx.conf" > "/etc/nginx/sites-available/${APP_NAME}"
-
-  ln -sf "/etc/nginx/sites-available/${APP_NAME}" "/etc/nginx/sites-enabled/${APP_NAME}"
-  [[ -e /etc/nginx/sites-enabled/default ]] && rm -f /etc/nginx/sites-enabled/default
-
-  nginx -t && systemctl reload nginx
-  ok "nginx configure"
-
-  echo
-  warn "Pour activer le HTTPS (recommande) :"
-  echo "     sudo apt install -y certbot python3-certbot-nginx"
-  echo "     sudo certbot --nginx -d ${NGINX_DOMAIN}"
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+  info "Ouverture du port ${PORT} dans ufw"
+  ufw allow "${PORT}/tcp" >/dev/null 2>&1 && ok "Port ${PORT} autorise"
 fi
 
 # ---------------------------------------------------------------------------
 # Recapitulatif
 # ---------------------------------------------------------------------------
+if [[ $ENABLE_HTTPS -eq 1 ]]; then scheme="https"; else scheme="http"; fi
+ip_address="$(hostname -I | awk '{print $1}')"
+
 echo
 echo "==========================================================="
-echo " GameShelf est installe."
+echo " GameShelf est installe. Aucun compte, aucun mot de passe."
 echo "-----------------------------------------------------------"
-if [[ -n "$NGINX_DOMAIN" ]]; then
-  echo " URL           : http://${NGINX_DOMAIN}"
+echo " Sur ce serveur   : ${scheme}://localhost:${PORT}"
+echo " Sur le telephone : ${scheme}://${ip_address}:${PORT}"
+echo "-----------------------------------------------------------"
+if [[ $ENABLE_HTTPS -eq 1 ]]; then
+  echo " Le certificat est auto-signe : le navigateur affichera un"
+  echo " avertissement a la premiere visite. Acceptez-le une fois"
+  echo " (Parametres avances > Continuer), c'est ce qui autorise"
+  echo " la camera pour le scan de codes-barres."
 else
-  echo " URL           : http://$(hostname -I | awk '{print $1}'):${PORT}"
-  echo "                 (pour un nom de domaine et du HTTPS, relancez"
-  echo "                  avec --nginx <domaine>)"
-fi
-echo " Identifiant   : admin"
-if [[ -n "$ADMIN_PASSWORD_GENERATED" ]]; then
-  echo " Mot de passe  : ${ADMIN_PASSWORD_GENERATED}"
-  echo "                 (a changer depuis l'interface, menu Compte)"
-else
-  echo " Mot de passe  : inchange (voir ${APP_DIR}/.env)"
+  echo " Mode HTTP : le scan par camera sera refuse par le"
+  echo " navigateur du telephone. Relancez sans --http-only"
+  echo " pour l'activer."
 fi
 echo "-----------------------------------------------------------"
-echo " Logs          : sudo journalctl -u ${APP_NAME} -f"
-echo " Redemarrer    : sudo systemctl restart ${APP_NAME}"
-echo " Donnees       : ${APP_DIR}/data"
+echo " Logs        : sudo journalctl -u ${APP_NAME} -f"
+echo " Redemarrer  : sudo systemctl restart ${APP_NAME}"
+echo " Donnees     : ${APP_DIR}/data"
 echo "==========================================================="
