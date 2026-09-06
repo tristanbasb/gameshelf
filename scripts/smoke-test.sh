@@ -171,6 +171,23 @@ check "GET /css/style.css"    "$(status "$BASE_URL/css/style.css")"    "200"
 check "GET /js/app.js"        "$(status "$BASE_URL/js/app.js")"        "200"
 check "GET /page-inexistante" "$(status "$BASE_URL/page-inexistante")" "404"
 
+# --- 10. Invalidation du cache ---------------------------------------------
+# La page doit pointer vers des URL portant une empreinte, et ces URL doivent
+# etre servies. Sans cela, un navigateur garderait l'ancienne interface apres
+# une mise a jour.
+home="$(curl -sk "$BASE_URL/")"
+asset_path="$(printf '%s' "$home" | grep -oE '/a/[a-f0-9]+/js/app\.js' | head -n1)"
+if [[ -n "$asset_path" ]]; then
+  printf '%s  PASS%s  la page reference une URL versionnee (%s)\n' "$c_green" "$c_reset" "$asset_path"
+  check "  le fichier versionne est servi" "$(status "$BASE_URL$asset_path")" "200"
+  check "  les modules importes le sont aussi" \
+    "$(status "$BASE_URL${asset_path%app.js}ui.js")" "200"
+  contains "  page non mise en cache" "$(curl -sk -D- -o /dev/null "$BASE_URL/")" 'no-store'
+else
+  printf '%s  FAIL%s  aucune URL versionnee dans la page\n' "$c_red" "$c_reset"
+  FAILURES=$((FAILURES + 1))
+fi
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
   printf '%sTous les tests sont passes.%s\n' "$c_green" "$c_reset"

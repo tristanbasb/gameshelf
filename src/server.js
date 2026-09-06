@@ -1,6 +1,8 @@
 import express from 'express';
 import http from 'node:http';
 import https from 'node:https';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { config, localAddresses } from './config.js';
 import { db } from './db.js';
@@ -61,9 +63,59 @@ app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
 });
 
-app.get(['/', '/index.html'], (_req, res) => {
-  res.setHeader('Cache-Control', 'no-cache');
-  res.sendFile(path.join(publicDir, 'index.html'));
+/* --------------------------------------------------------------------------
+ * Invalidation du cache
+ *
+ * L'interface n'a pas d'etape de build : sans precaution, un navigateur garde
+ * l'ancien CSS ou l'ancien script apres une mise a jour, parfois une heure,
+ * parfois jusqu'a un rechargement force. Les fichiers sont donc aussi servis
+ * sous /a/<empreinte>/, empreinte qui change des qu'un fichier change.
+ *
+ * Le prefixe fait partie du chemin, pas d'un parametre : les imports relatifs
+ * entre modules (`./api.js`) se resolvent alors d'eux-memes dans le meme
+ * dossier versionne, sans avoir a reecrire le code servi.
+ * ----------------------------------------------------------------------- */
+
+const VERSIONED_ASSETS = ['css/style.css', 'js/app.js', 'js/api.js', 'js/ui.js'];
+
+function assetVersion() {
+  const hash = crypto.createHash('sha1');
+  for (const relative of VERSIONED_ASSETS) {
+    try {
+      const { mtimeMs, size } = fs.statSync(path.join(publicDir, relative));
+      hash.update(`${relative}:${mtimeMs}:${size};`);
+    } catch {
+      // Fichier absent : l'empreinte change, ce qui est le comportement voulu.
+      hash.update(`${relative}:absent;`);
+    }
+  }
+  return hash.digest('hex').slice(0, 10);
+}
+
+// Ces URL sont uniques par version : elles peuvent etre gardees indefiniment.
+app.use(
+  '/a/:version',
+  express.static(publicDir, {
+    index: false,
+    immutable: true,
+    maxAge: '1y',
+    dotfiles: 'ignore',
+  }),
+);
+
+app.get(['/', '/index.html'], (_req, res, next) => {
+  fs.readFile(path.join(publicDir, 'index.html'), 'utf8', (err, html) => {
+    if (err) return next(err);
+    const version = assetVersion();
+    // La page elle-meme n'est jamais mise en cache : c'est elle qui porte
+    // l'empreinte, elle doit donc toujours etre relue.
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('html').send(
+      html
+        .replace('/css/style.css', `/a/${version}/css/style.css`)
+        .replace('/js/app.js', `/a/${version}/js/app.js`),
+    );
+  });
 });
 
 /*
