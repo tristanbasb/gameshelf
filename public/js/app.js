@@ -697,6 +697,36 @@ async function showLookup(code, modal, result, status) {
 }
 
 /* ==========================================================================
+   Suppression annulable
+   ========================================================================== */
+
+/**
+ * Une suppression est definitive et souvent regrettee dans la seconde qui
+ * suit. On laisse donc une fenetre de rattrapage dans la notification.
+ *
+ * La restauration recree la fiche : elle retrouve tous ses champs, mais
+ * recoit un nouvel identifiant et une nouvelle date d'ajout. C'est sans
+ * consequence pour un inventaire, et bien preferable a une perte seche.
+ */
+function offerUndoDelete(game) {
+  toast(`« ${game.title} » supprimé`, 'success', {
+    duration: 9000,
+    action: {
+      label: 'Annuler',
+      onClick: async () => {
+        try {
+          await api.createGame(game);
+          toast(`« ${game.title} » restauré`);
+          refresh({ withMeta: true });
+        } catch (err) {
+          toast(`Restauration impossible : ${err.message}`, 'error');
+        }
+      },
+    },
+  });
+}
+
+/* ==========================================================================
    Modale : fiche detaillee
    ========================================================================== */
 
@@ -731,23 +761,27 @@ function openDetailModal(game) {
     [game.platform, game.region].filter(Boolean).join(' · ') || 'Plateforme non renseignée';
 
   // --- Pastilles de synthese ----------------------------------------------
-  const missing = missingParts(game);
-  const tags = [];
-  tags.push(
-    missing.length
-      ? `<span class="tag tag-missing">sans ${esc(missing.join(', '))}</span>`
-      : `<span class="tag tag-ok">${CHECK_ICON} Complet</span>`,
-  );
-  if (game.condition) {
-    tags.push(`<span class="tag tag-cond" style="--cond:${CONDITION_COLORS[game.condition]}">
-      <span class="dot" style="background:${CONDITION_COLORS[game.condition]}"></span>
-      ${esc(CONDITION_LABELS[game.condition])}</span>`);
+  // Recalculees a la demande : cocher un element de contenu doit faire passer
+  // la fiche de « sans notice » a « Complet » sans la rouvrir.
+  function refreshDetailSummary() {
+    const missing = missingParts(game);
+    const tags = [
+      missing.length
+        ? `<span class="tag tag-missing">sans ${esc(missing.join(', '))}</span>`
+        : `<span class="tag tag-ok">${CHECK_ICON} Complet</span>`,
+    ];
+    if (game.condition) {
+      tags.push(`<span class="tag tag-cond" style="--cond:${CONDITION_COLORS[game.condition]}">
+        <span class="dot" style="background:${CONDITION_COLORS[game.condition]}"></span>
+        ${esc(CONDITION_LABELS[game.condition])}</span>`);
+    }
+    if (game.quantity > 1) {
+      tags.push(`<span class="tag tag-qty">×${game.quantity} exemplaires</span>`);
+    }
+    if (game.has_iso) tags.push(`<span class="tag tag-ok">${CHECK_ICON} ISO</span>`);
+    modal.$('#detail-tags').innerHTML = tags.join('');
   }
-  if (game.quantity > 1) {
-    tags.push(`<span class="tag tag-qty">×${game.quantity} exemplaires</span>`);
-  }
-  if (game.has_iso) tags.push(`<span class="tag tag-ok">${CHECK_ICON} ISO</span>`);
-  modal.$('#detail-tags').innerHTML = tags.join('');
+  refreshDetailSummary();
 
   // --- Caracteristiques ---------------------------------------------------
   modal.$('#detail-rows').innerHTML = [
@@ -761,11 +795,38 @@ function openDetailModal(game) {
   ].join('');
 
   // --- Contenu de l'exemplaire --------------------------------------------
-  modal.$('#detail-parts').innerHTML = PARTS.map((part) => {
-    const present = Boolean(game[part.key]);
-    return `<span class="part ${present ? 'present' : 'absent'}">
-      ${present ? CHECK_ICON : CROSS_ICON}${esc(part.label)}</span>`;
-  }).join('');
+  // Retrouver une notice au fond d'un carton est frequent : chaque element se
+  // corrige d'un clic, sans ouvrir le formulaire.
+  const partsBox = modal.$('#detail-parts');
+  const renderParts = () => {
+    partsBox.innerHTML = PARTS.map((part) => {
+      const present = Boolean(game[part.key]);
+      return `<button type="button" class="part ${present ? 'present' : 'absent'}"
+        data-part="${part.key}" title="${present ? 'Marquer comme manquant' : 'Marquer comme présent'}">
+        ${present ? CHECK_ICON : CROSS_ICON}${esc(part.label)}</button>`;
+    }).join('');
+  };
+  renderParts();
+
+  partsBox.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-part]');
+    if (!button) return;
+    const key = button.dataset.part;
+    const avant = game[key];
+
+    game[key] = avant ? 0 : 1;
+    renderParts();
+    try {
+      Object.assign(game, await api.updateGame(game.id, { [key]: game[key] }));
+      renderParts();
+      refreshDetailSummary();
+      refresh({ withMeta: true });
+    } catch (err) {
+      game[key] = avant;
+      renderParts();
+      toast(err.message, 'error');
+    }
+  });
 
   // --- Tags et notes, masques quand ils sont vides -------------------------
   const tagList = game.tags ? game.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
@@ -818,7 +879,7 @@ function openDetailModal(game) {
     try {
       await api.deleteGame(game.id);
       modal.close();
-      toast('Jeu supprimé');
+      offerUndoDelete(game);
       refresh({ withMeta: true });
     } catch (err) {
       toast(err.message, 'error');
@@ -1090,6 +1151,18 @@ function openIoModal() {
   const modal = openModal('tpl-io-modal');
   const fileInput = modal.$('#import-file');
   const report = modal.$('#import-report');
+
+  // L'export suit les filtres affiches : sortir la liste des jeux auxquels il
+  // manque la notice se fait en filtrant puis en exportant, sans retouche.
+  const actifs = Object.entries(state.filters).filter(([, v]) => v);
+  const query = new URLSearchParams(Object.fromEntries(actifs));
+  modal.$('#export-csv').href = `/api/export?format=csv&${query}`;
+  modal.$('#export-json').href = `/api/export?format=json&${query}`;
+  modal.$('#export-scope').textContent = actifs.length
+    ? `Seuls les jeux correspondant aux filtres en cours (${actifs
+      .map(([key]) => CHIP_LABELS[key].toLowerCase())
+      .join(', ')}).`
+    : 'Toute la collection.';
 
   modal.$('#btn-do-import').addEventListener('click', async () => {
     const file = fileInput.files?.[0];
@@ -1389,6 +1462,13 @@ async function init() {
   }
 
   await refresh({ withMeta: true });
+
+  // Raccourci « Scanner » de l'ecran d'accueil : l'application s'ouvre
+  // directement sur la camera, sans passer par la collection.
+  if (new URLSearchParams(window.location.search).get('action') === 'scan') {
+    writeUrl();
+    openScanModal();
+  }
 }
 
 init();

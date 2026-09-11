@@ -1,4 +1,4 @@
-import { db, CONDITIONS, PARTS } from './db.js';
+import { db, CONDITIONS, PARTS, normalizeForSearch, buildSearchText } from './db.js';
 
 const MAX_TEXT = 120;
 const MAX_NOTES = 8000;
@@ -108,13 +108,23 @@ export function normalizeGame(input = {}) {
     row[part] = flag(input[part], 1);
   }
 
+  // Recalculee a chaque ecriture, pour ne jamais diverger du reste de la ligne.
+  row.search_text = buildSearchText(row);
+
   return row;
 }
 
 const COLUMNS = [
   'title', 'platform', 'region', 'serial', 'ean', 'quantity', 'condition',
-  ...PARTS, 'has_iso', 'favorite', 'cover_url', 'notes', 'tags',
+  ...PARTS, 'has_iso', 'favorite', 'cover_url', 'notes', 'tags', 'search_text',
 ];
+
+/*
+ * Colonnes renvoyees aux clients. search_text en est exclue : elle duplique
+ * les autres champs et gonflerait la liste d'environ 40 % pour rien.
+ */
+const SELECT_COLUMNS = ['id', ...COLUMNS.filter((c) => c !== 'search_text'), 'created_at', 'updated_at']
+  .join(', ');
 
 const SORTABLE = {
   title: 'title COLLATE NOCASE',
@@ -134,12 +144,15 @@ export function listGames(query = {}) {
   const params = {};
 
   if (query.search) {
-    where.push(
-      '(title LIKE @search OR platform LIKE @search OR region LIKE @search'
-      + ' OR serial LIKE @search OR tags LIKE @search OR notes LIKE @search'
-      + ' OR ean LIKE @search)',
-    );
-    params.search = `%${String(query.search).trim()}%`;
+    // Chaque mot doit apparaitre quelque part dans la fiche, dans n'importe
+    // quel ordre : « jak daxter » trouve « Jak and Daxter ». La colonne
+    // interrogee etant deja sans accents ni majuscules, « asterix » trouve
+    // « Astérix ».
+    const words = normalizeForSearch(query.search).split(/\s+/).filter(Boolean).slice(0, 8);
+    words.forEach((word, index) => {
+      where.push(`search_text LIKE @mot${index}`);
+      params[`mot${index}`] = `%${word}%`;
+    });
   }
   if (query.ean) {
     where.push('ean = @ean');
@@ -199,7 +212,7 @@ export function listGames(query = {}) {
 
   // LIMIT -1 signifie "aucune limite" en SQLite.
   const items = db
-    .prepare(`SELECT * FROM games ${whereSql} ${orderSql} LIMIT @limit OFFSET @offset`)
+    .prepare(`SELECT ${SELECT_COLUMNS} FROM games ${whereSql} ${orderSql} LIMIT @limit OFFSET @offset`)
     .all({ ...params, limit, offset });
 
   return {
@@ -212,14 +225,15 @@ export function listGames(query = {}) {
   };
 }
 
-export const getGame = (id) => db.prepare('SELECT * FROM games WHERE id = ?').get(id);
+export const getGame = (id) =>
+  db.prepare(`SELECT ${SELECT_COLUMNS} FROM games WHERE id = ?`).get(id);
 
 /** Recherche par code-barres, pour le scan depuis un telephone. */
 export function findByEan(ean) {
   const clean = normalizeEan(ean);
   if (!clean) return [];
   return db
-    .prepare('SELECT * FROM games WHERE ean = ? ORDER BY id ASC')
+    .prepare(`SELECT ${SELECT_COLUMNS} FROM games WHERE ean = ? ORDER BY id ASC`)
     .all(clean);
 }
 

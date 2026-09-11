@@ -7,6 +7,15 @@
   <title>GameVault — collection de jeux physiques</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+
+  <!-- Installation sur l'écran d'accueil du téléphone : l'application
+       s'ouvre alors en plein écran, sans barre d'adresse. -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/img/icon-180.png">
+  <meta name="theme-color" content="#090d16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GameVault">
 </head>
 <body>
 
@@ -418,10 +427,11 @@
         </button>
       </div>
       <div class="modal-body">
-        <h3 style="font-size:14px; margin-bottom:10px">Exporter ma collection</h3>
+        <h3 style="font-size:14px; margin-bottom:6px">Exporter</h3>
+        <p style="color:var(--text-muted); font-size:12.5px; margin:0 0 10px" id="export-scope"></p>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px">
-          <a class="btn" href="/api/export?format=csv" download>Fichier CSV</a>
-          <a class="btn" href="/api/export?format=json" download>Fichier JSON</a>
+          <a class="btn" id="export-csv" href="/api/export?format=csv" download>Fichier CSV</a>
+          <a class="btn" id="export-json" href="/api/export?format=json" download>Fichier JSON</a>
           <a class="btn" href="/api/backup" download title="Copie complète de la base SQLite">Sauvegarde .db</a>
         </div>
 

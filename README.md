@@ -26,8 +26,10 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 - **Complétude** : cochez ce que contient l'exemplaire (boîte, jaquette papier,
   notice, disque ou cartouche). La vue **Incomplets** liste d'un coup tout ce
   qui est amputé d'une pièce.
-- **Recherche instantanée** sur le titre, la plateforme, les tags, les notes
-  et le code-barres.
+- **Recherche instantanée** sur le titre, la plateforme, la région, le serial,
+  les tags, les notes et le code-barres. Insensible aux accents et à la casse
+  — « asterix » trouve « Astérix » — et multi-mots dans n'importe quel ordre :
+  « daxter jak » trouve « Jak and Daxter ».
 - **Filtres** par état, plateforme, région, tag, favoris, incomplets et
   « sans ISO » — combinables, et reflétés dans l'URL.
 - **Saisie en chaîne** : le bouton **Enregistrer et suivant** garde la fiche
@@ -38,6 +40,12 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
   colonne. Pagination réglable, avec une option **Tout afficher** (400 fiches
   s'affichent en une vingtaine de millisecondes).
 - **Import / export** CSV et JSON, plus une sauvegarde complète de la base.
+  L'export suit les filtres affichés : sortir la liste des jeux auxquels il
+  manque la notice revient à filtrer, puis exporter.
+- **Suppression annulable** : une fiche supprimée par erreur se récupère
+  depuis la notification, pendant neuf secondes.
+- **Installable sur le téléphone** : ajoutée à l'écran d'accueil, l'application
+  s'ouvre en plein écran, avec un raccourci direct vers le scanner.
 - **Thème sombre / clair**, interface responsive, utilisable au clavier.
 
 ### États disponibles

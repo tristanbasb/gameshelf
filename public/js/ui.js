@@ -97,20 +97,45 @@ export function fmtDate(value) {
 /* Notifications                                                              */
 /* -------------------------------------------------------------------------- */
 
-export function toast(message, type = 'success', duration = 4000) {
+/**
+ * Notification passagere. `action` ajoute un bouton dans la notification —
+ * c'est ce qui permet de proposer « Annuler » juste apres une suppression,
+ * au moment exact ou l'on s'apercoit de l'erreur.
+ */
+export function toast(message, type = 'success', { duration = 4000, action } = {}) {
   const container = $('#toasts');
   if (!container) return;
 
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.textContent = message;
-  container.appendChild(el);
 
-  setTimeout(() => {
+  const text = document.createElement('span');
+  text.textContent = message;
+  text.style.flex = '1';
+  el.appendChild(text);
+
+  let timer;
+  const dismiss = () => {
+    clearTimeout(timer);
     el.style.transition = 'opacity .2s';
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 220);
-  }, duration);
+  };
+
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'toast-action';
+    button.textContent = action.label;
+    button.addEventListener('click', () => {
+      dismiss();
+      action.onClick();
+    });
+    el.appendChild(button);
+  }
+
+  container.appendChild(el);
+  timer = setTimeout(dismiss, duration);
 }
 
 /* -------------------------------------------------------------------------- */

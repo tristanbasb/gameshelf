@@ -980,10 +980,15 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
+  font-family: inherit;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-muted);
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
 }
+.part:hover { filter: brightness(1.25); }
+.part:active { transform: scale(0.96); }
 .part.present { color: var(--success); border-color: rgba(52, 211, 153, 0.3); }
 .part.absent {
   color: var(--danger);
@@ -1129,6 +1134,19 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   font-size: 13px;
   animation: slide-in 0.18s ease;
 }
+.toast-action {
+  flex: none;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast-action:hover { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+
 .toast.success { border-left-color: var(--success); }
 .toast.error { border-left-color: var(--danger); }
 .toast.info { border-left-color: var(--info); }

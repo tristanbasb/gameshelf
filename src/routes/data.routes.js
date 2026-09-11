@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import multer from 'multer';
 import { db } from '../db.js';
 import { config } from '../config.js';
-import { normalizeGame, insertMany, ValidationError } from '../games.js';
+import { normalizeGame, insertMany, listGames, ValidationError } from '../games.js';
 import { csvToObjects, objectsToCsv } from '../csv.js';
 
 const router = express.Router();
@@ -67,7 +67,9 @@ const CSV_COLUMNS = [
 ];
 
 router.get('/export', (req, res) => {
-  const rows = db.prepare('SELECT * FROM games ORDER BY title COLLATE NOCASE ASC').all();
+  // L'export reprend les filtres de la requete : on exporte ce qu'on regarde.
+  // Sans filtre, c'est toute la collection, comme auparavant.
+  const rows = listGames({ ...req.query, sort: 'title', dir: 'asc', limit: 'all' }).items;
   const stamp = new Date().toISOString().slice(0, 10);
 
   if (String(req.query.format).toLowerCase() === 'csv') {

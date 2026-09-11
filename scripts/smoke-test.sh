@@ -96,6 +96,25 @@ if [[ -n "$CREATED_ID" ]]; then
     "$(curl -sk "$BASE_URL/api/games?incomplete=1&search=__smoke_test__")" '__smoke_test__'
   contains "recherche par serial" \
     "$(curl -sk "$BASE_URL/api/games?search=SLES99999")" '__smoke_test__'
+
+  # La recherche interroge une colonne normalisee : insensible aux accents,
+  # a la casse, et exigeant chaque mot sans imposer leur ordre.
+  contains "  recherche sans tenir compte de la casse" \
+    "$(curl -sk "$BASE_URL/api/games?search=sles99999")" '__smoke_test__'
+  contains "  recherche multi-mots, ordre indifferent" \
+    "$(curl -sk "$BASE_URL/api/games?search=$(printf 'SLES99999%%20__smoke_test__')")" '__smoke_test__'
+  # Un mot absent doit exclure la fiche, meme si l'autre correspond.
+  empty_body="$(curl -sk "$BASE_URL/api/games?search=SLES99999%20motabsentxyz")"
+  if [[ "$empty_body" == *'"total":0'* ]]; then
+    printf '%s  PASS%s    un mot non trouve exclut la fiche\n' "$c_green" "$c_reset"
+  else
+    printf '%s  FAIL%s    un mot non trouve devrait exclure la fiche\n' "$c_red" "$c_reset"
+    FAILURES=$((FAILURES + 1))
+  fi
+
+  # L'export doit suivre les filtres passes en parametre.
+  contains "export filtre sur la recherche" \
+    "$(curl -sk "$BASE_URL/api/export?format=csv&search=SLES99999")" '__smoke_test__'
   contains "filtre par region" \
     "$(curl -sk "$BASE_URL/api/games?region=PAL&search=__smoke_test__")" '__smoke_test__'
 fi
@@ -174,6 +193,11 @@ check "GET /page-inexistante" "$(status "$BASE_URL/page-inexistante")" "404"
 # Decodeur embarque : sans lui, le scan serait impossible sur Safari.
 check "GET /js/barcode.js"            "$(status "$BASE_URL/js/barcode.js")"            "200"
 check "GET /js/vendor/zxing.min.js"   "$(status "$BASE_URL/js/vendor/zxing.min.js")"   "200"
+
+# Installation sur l'ecran d'accueil d'un telephone.
+check "GET /manifest.webmanifest" "$(status "$BASE_URL/manifest.webmanifest")" "200"
+check "GET /img/icon-192.png"     "$(status "$BASE_URL/img/icon-192.png")"     "200"
+check "GET /img/icon-180.png"     "$(status "$BASE_URL/img/icon-180.png")"     "200"
 
 # Certificat telechargeable, pour l'installer sur un telephone.
 if [[ "$BASE_URL" == https://* ]]; then

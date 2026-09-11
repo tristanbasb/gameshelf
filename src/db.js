@@ -57,7 +57,39 @@ const migrations = [
       CREATE INDEX idx_games_serial    ON games(serial);
     `);
   },
+
+  function addSearchText() {
+    // Chercher sur sept colonnes a coups de LIKE imposait la casse et les
+    // accents : « asterix » ne trouvait pas « Astérix », et « jak daxter » ne
+    // trouvait rien du tout puisque les deux mots ne se suivent pas.
+    // Une colonne unique, minuscule et sans accents, regle les trois.
+    db.exec("ALTER TABLE games ADD COLUMN search_text TEXT NOT NULL DEFAULT ''");
+
+    const rows = db.prepare('SELECT * FROM games').all();
+    const update = db.prepare('UPDATE games SET search_text = ? WHERE id = ?');
+    for (const row of rows) update.run(buildSearchText(row), row.id);
+  },
 ];
+
+/**
+ * Forme normalisee d'un texte pour la recherche : sans accents, en
+ * minuscules. La meme fonction sert a l'ecriture et a l'interrogation, sans
+ * quoi les deux cesseraient de se correspondre.
+ */
+export function normalizeForSearch(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    // Les signes diacritiques isoles par NFD sont simplement retires.
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+}
+
+/** Champs sur lesquels porte la recherche libre. */
+const SEARCHABLE = ['title', 'platform', 'region', 'serial', 'ean', 'tags', 'notes'];
+
+export function buildSearchText(row) {
+  return normalizeForSearch(SEARCHABLE.map((key) => row[key] ?? '').join(' '));
+}
 
 const currentVersion = db.pragma('user_version', { simple: true });
 if (currentVersion < migrations.length) {
