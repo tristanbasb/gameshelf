@@ -251,8 +251,11 @@ function coverGeneree(titre) {
  */
 function mediaMarkup(game) {
   if (game.cover_url) {
-    return `<img class="cover-main" src="${esc(game.cover_url)}" alt="" loading="lazy"
-      data-titre="${esc(game.title)}">`;
+    // Deux fois la meme source : l'une floutee en fond pour remplir la tuile,
+    // l'autre entiere par-dessus. Le navigateur ne la telecharge qu'une fois.
+    return `<img class="cover-fond" src="${esc(game.cover_url)}" alt="" aria-hidden="true" loading="lazy">
+      <img class="cover-main" src="${esc(game.cover_url)}" alt="" loading="lazy"
+        data-titre="${esc(game.title)}">`;
   }
   return coverGeneree(game.title);
 }
@@ -1398,6 +1401,10 @@ function bindEvents() {
       if (!(img instanceof HTMLImageElement)) return;
       if (img.classList.contains('mini-cover')) {
         img.removeAttribute('src');
+        return;
+      }
+      if (img.classList.contains('cover-fond')) {
+        img.remove();
         return;
       }
       img.outerHTML = coverGeneree(img.dataset.titre || '');

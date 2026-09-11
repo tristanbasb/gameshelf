@@ -549,17 +549,37 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 
 .card-media { position: absolute; inset: 0; }
 
-/* `cover` remplit la tuile en rognant les bords — c'est le parti pris de la
-   vitrine. Passer a `contain` montre la jaquette entiere, au prix de bandes
-   sur les cotes : un seul mot a changer ici. */
+/*
+ * La jaquette est montree entiere. C'est l'objet que l'on collectionne : la
+ * rogner pour remplir un cadre irait contre le propos, et la tranche du
+ * boitier fait partie de ce que l'on reconnait.
+ *
+ * Le vide laisse sur les cotes n'est pas comble par un aplat mais par la
+ * jaquette elle-meme, agrandie et floutee derriere : la tuile reste pleine
+ * bord a bord, sans qu'aucun pixel de l'illustration soit perdu. Les deux
+ * images partagent la meme source, donc le meme telechargement.
+ */
+.cover-fond {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* L'agrandissement evite les bords delaves que le flou laisse autrement
+     apparaitre sur le pourtour. */
+  transform: scale(1.2);
+  filter: blur(18px) saturate(1.35) brightness(0.5);
+}
+
 .cover-main {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: var(--ajustement-jaquette, cover);
+  object-fit: contain;
   transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.card:hover .cover-main { transform: scale(1.06); }
+.card:hover .cover-main { transform: scale(1.05); }
 
 /*
  * Jaquette fabriquee, pour les exemplaires sans visuel.
