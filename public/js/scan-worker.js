@@ -3,15 +3,13 @@
  *
  * Le decodage lui-meme ne coute presque rien : moins d'une milliseconde par
  * image une fois les pixels disponibles. Ce qui coute, c'est justement de
- * les obtenir — sortir l'image de la carte graphique demande 20 a 40 ms.
- * Effectue sur le fil principal, ce transfert figeait l'affichage entre
- * chaque tentative : l'apercu de la camera saccadait, et le scan paraissait
- * long alors que la lecture, elle, etait immediate.
+ * les obtenir — sortir de la carte graphique les douze millions de pixels
+ * d'une photo demande plusieurs centaines de millisecondes. Fait sur le fil
+ * principal, ce transfert figerait l'interface le temps de la lecture.
  *
- * Ce worker recoit une image deja decoupee au viseur, la reduit, en extrait
+ * Ce worker recoit la photo, la reduit a la definition demandee, en extrait
  * les niveaux de gris et la confie a ZXing. Le fil principal n'a plus qu'a
- * fabriquer l'image (0,1 ms) et a afficher le resultat : l'apercu reste
- * fluide, et l'on peut analyser bien plus d'images par seconde.
+ * fabriquer l'image (0,1 ms) et a afficher le resultat.
  */
 
 const FORMATS = ['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128', 'ITF'];

@@ -1,7 +1,7 @@
 {
   "name": "GameVault — collection de jeux",
   "short_name": "GameVault",
-  "description": "Inventaire local d'une collection de jeux vidéo physiques, avec scan de codes-barres.",
+  "description": "Inventaire local d'une collection de jeux vidéo physiques, avec lecture des codes-barres en photo.",
   "lang": "fr",
   "start_url": "/",
   "scope": "/",
@@ -26,8 +26,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Scanner un code-barres",
-      "short_name": "Scanner",
+      "name": "Chercher par code-barres",
+      "short_name": "Code-barres",
       "url": "/?action=scan",
       "icons": [{ "src": "/img/icon-192.png", "sizes": "192x192" }]
     },

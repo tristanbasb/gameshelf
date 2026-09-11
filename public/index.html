@@ -42,12 +42,12 @@
   </div>
 
   <div class="topbar-actions">
-    <button class="btn btn-primary" id="btn-scan" title="Scanner un code-barres (s)">
+    <button class="btn btn-primary" id="btn-scan" title="Chercher par code-barres (s)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
         <path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/>
       </svg>
-      <span class="hide-sm">Scanner</span>
+      <span class="hide-sm">Code-barres</span>
     </button>
 
     <button class="btn" id="btn-add" title="Ajouter un jeu (n)">
@@ -182,7 +182,7 @@
 
 <!-- Scan au pouce : sur telephone, le geste principal ne doit pas obliger
      a viser le haut de l'ecran. Masque sur grand ecran. -->
-<button class="fab" id="btn-scan-fab" aria-label="Scanner un code-barres">
+<button class="fab" id="btn-scan-fab" aria-label="Chercher par code-barres">
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
     <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
     <path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/>
@@ -196,37 +196,25 @@
   <div class="modal-backdrop" data-close-on-backdrop>
     <div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="scan-title">
       <div class="modal-head">
-        <h2 id="scan-title">Scanner un code-barres</h2>
+        <h2 id="scan-title">Chercher par code-barres</h2>
         <button class="btn btn-ghost btn-icon" data-close aria-label="Fermer">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
 
       <div class="modal-body">
-        <div class="scanner" id="scanner-frame">
-          <video id="scanner-video" playsinline muted></video>
-          <div class="scanner-reticle"></div>
-          <button type="button" class="torch-btn" id="btn-torch" hidden
-                  title="Éclairage" aria-label="Allumer l'éclairage">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 2h6l-1 6h3l-7 14 2-9H8l1-11z"/>
-            </svg>
-          </button>
-          <input type="range" class="zoom-range" id="scan-zoom" hidden
-                 min="1" max="4" step="0.1" value="1"
-                 title="Zoom" aria-label="Zoom de la caméra">
-        </div>
-        <p class="scanner-status" id="scanner-status">Démarrage de la caméra…</p>
-
-        <!-- L'appareil photo du téléphone fait bien mieux que le flux vidéo :
-             mise au point macro, stabilisation, pleine définition. -->
+        <!-- La prise de vue revient a l'appareil photo du systeme : mise au
+             point macro, stabilisation, pleine definition. Ce n'est qu'un
+             champ de fichier, donc aucune permission a accorder et pas de
+             connexion securisee exigee. -->
         <label class="btn btn-primary scan-photo-btn" for="scan-photo">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 7h3l2-3h8l2 3h3v13H3z"/><circle cx="12" cy="13" r="4"/>
           </svg>
           Photographier le code
         </label>
         <input type="file" id="scan-photo" accept="image/*" capture="environment" hidden>
+        <p class="scanner-status" id="scanner-status">Cadrez le code-barres bien à plat, entier dans l’image.</p>
 
         <div class="field" style="margin-top:14px">
           <label for="scan-manual">Ou saisir le code à la main</label>
@@ -363,7 +351,7 @@
               <label for="f-ean">Code-barres (EAN)</label>
               <div style="display:flex; gap:8px">
                 <input class="input" id="f-ean" name="ean" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="8 à 14 chiffres">
-                <button type="button" class="btn btn-icon" id="btn-scan-field" title="Scanner" aria-label="Scanner le code-barres">
+                <button type="button" class="btn btn-icon" id="btn-scan-field" title="Photographier le code" aria-label="Photographier le code-barres">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg>
                 </button>
               </div>

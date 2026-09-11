@@ -1086,89 +1086,11 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
 .suggestion .s-meta { font-size: 11.5px; color: var(--text-muted); }
 
 /* --------------------------------------------------------------------------
-   Scanner de codes-barres
+   Recherche par code-barres
    -------------------------------------------------------------------------- */
 
-.scanner {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: #000;
-  display: grid;
-  place-items: center;
-}
-.scanner video { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* Position posee par le script : le viseur doit coincider exactement avec la
-   zone envoyee au decodeur (RETICULE dans app.js). */
-.scanner-reticle {
-  position: absolute;
-  left: 6%; right: 6%; top: 28%; bottom: 28%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  border-radius: 10px;
-  box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.35);
-  pointer-events: none;
-  overflow: hidden;
-}
-
-/* Un trait qui balaie le viseur. Il ne suit pas la recherche — celle-ci fait
-   vingt tentatives par seconde, invisibles — mais il montre que l'appareil
-   travaille pendant qu'on cherche l'angle, ce qui evite de croire qu'il a
-   cesse de chercher. Anime par transformation seule : le compositeur s'en
-   charge, sans rien demander au fil principal qui decoupe les images. */
-.scanner-reticle::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    transparent 44%,
-    rgba(167, 139, 250, 0.95) 50%,
-    transparent 56%
-  );
-  animation: scan-sweep 2.4s ease-in-out infinite;
-}
-@keyframes scan-sweep {
-  0%, 100% { transform: translateY(-44%); }
-  50% { transform: translateY(44%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .scanner-reticle::after { animation: none; opacity: 0.5; }
-}
-
-/* Indique que toucher l'image refait la mise au point. */
-.scanner.focusable { cursor: crosshair; }
-
-.torch-btn {
-  position: absolute;
-  right: 10px; bottom: 10px;
-  width: 38px; height: 38px;
-  display: grid; place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  color: #fff;
-  cursor: pointer;
-  z-index: 2;
-}
-.torch-btn.on { background: var(--warning); color: #1a1205; border-color: transparent; }
-
-/* Zoom de la camera : grossir le code sans avoir a en approcher le telephone,
-   qui ne sait plus faire le point en dessous d'une dizaine de centimetres. */
-.zoom-range {
-  position: absolute;
-  left: 14px; right: 60px; bottom: 19px;
-  z-index: 2;
-  height: 20px;
-  accent-color: var(--accent);
-  background: transparent;
-  cursor: pointer;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
-}
-/* Le recours principal quand l'apercu peine : il doit se voir et se toucher
-   sans viser, d'ou la pleine largeur et la hauteur d'un bouton de pouce. */
+/* Seule action de la fenetre : pleine largeur et hauteur d'un bouton de
+   pouce, pour etre touchee du premier coup, telephone en main. */
 .scan-photo-btn {
   display: flex;
   align-items: center;

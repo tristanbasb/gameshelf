@@ -2,8 +2,8 @@
  * Lecture de codes-barres, quel que soit le navigateur.
  *
  * Chrome et Edge fournissent l'API BarcodeDetector. Safari, sur iPhone comme
- * sur Mac, ne l'implemente pas : sans repli, le scan y serait impossible et
- * il faudrait saisir treize chiffres a la main devant le rayon.
+ * sur Mac, ne l'implemente pas : sans repli, la lecture y serait impossible
+ * et il faudrait saisir treize chiffres a la main devant le rayon.
  *
  * Ce module expose un detecteur au comportement identique dans les deux cas —
  * `detect(image, largeur, hauteur)` renvoie un tableau de `{ rawValue }` — en
@@ -11,10 +11,9 @@
  * l'application. Ce dernier pese 350 Ko : il n'est telecharge qu'au moment ou
  * il sert.
  *
- * `image` est une ImageBitmap, deja decoupee a la zone du viseur : analyser
- * l'image entiere revenait a lire le code-barres sur une fraction des pixels
- * disponibles, et obligeait a coller le telephone sur la boite. Le detecteur
- * la libere lui-meme apres usage ; l'appelant n'a pas a s'en soucier.
+ * `image` est une ImageBitmap, `largeur` et `hauteur` la definition a
+ * laquelle l'analyser. Le detecteur la libere lui-meme apres usage ;
+ * l'appelant n'a pas a s'en soucier.
  */
 
 const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'itf'];
@@ -122,8 +121,8 @@ function workerDetector(worker) {
     attentes.delete(id);
     resoudre(code ? [{ rawValue: code }] : []);
   });
-  // Un worker qui meurt en cours de route ne doit pas laisser le scan
-  // suspendu a une promesse qui ne se resoudra jamais.
+  // Un worker qui meurt en cours de route ne doit pas laisser la lecture
+  // suspendue a une promesse qui ne se resoudra jamais.
   worker.addEventListener('error', () => {
     attentes.forEach((resoudre) => resoudre([]));
     attentes.clear();
@@ -186,9 +185,6 @@ async function zxingDetector() {
     close() {},
   };
 }
-
-/** Un decodeur est-il disponible, d'une facon ou d'une autre ? */
-export const barcodeReadingSupported = () => true;
 
 /**
  * Renvoie un detecteur pret a l'emploi. Prefere l'API du navigateur, plus
