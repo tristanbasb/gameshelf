@@ -37,6 +37,13 @@ function loadZxing() {
   return zxingLoader;
 }
 
+/*
+ * Les deux detecteurs recoivent un canvas, pas l'element video : l'appelant y
+ * a deja decoupe la zone du viseur, a la resolution du capteur. Analyser
+ * l'image entiere revenait a lire le code-barres sur une fraction des pixels
+ * disponibles, et obligeait a coller le telephone sur la boite.
+ */
+
 /** Detecteur bati sur l'API du navigateur. */
 async function nativeDetector() {
   const supported = await window.BarcodeDetector.getSupportedFormats();
@@ -44,11 +51,11 @@ async function nativeDetector() {
   const detector = new window.BarcodeDetector(formats.length ? { formats } : undefined);
   return {
     engine: 'natif',
-    detect: (video) => detector.detect(video),
+    detect: (canvas) => detector.detect(canvas),
   };
 }
 
-/** Detecteur bati sur ZXing : une image est extraite de la video par frame. */
+/** Detecteur bati sur ZXing, pour les navigateurs sans API de lecture. */
 async function zxingDetector() {
   const ZXing = await loadZxing();
 
@@ -58,33 +65,19 @@ async function zxingDetector() {
     ZXing.DecodeHintType.POSSIBLE_FORMATS,
     ZXING_FORMATS.map((name) => ZXing.BarcodeFormat[name]),
   );
-  // Les codes sont souvent lus de biais ou mal eclairs : on laisse le
+  // Les codes sont souvent lus de biais ou mal eclaires : on laisse le
   // decodeur insister, quitte a etre un peu plus lent par image.
   hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
   reader.setHints(hints);
 
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-
   return {
     engine: 'zxing',
-    detect(video) {
-      const width = video.videoWidth;
-      const height = video.videoHeight;
-      if (!width || !height) return [];
-
-      // On limite la largeur d'analyse : au-dela, le decodage coute cher
-      // sans rien apporter a la lecture d'un code-barres.
-      const scale = Math.min(1, 900 / width);
-      canvas.width = Math.round(width * scale);
-      canvas.height = Math.round(height * scale);
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+    detect(canvas) {
+      if (!canvas.width || !canvas.height) return [];
       try {
         const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
         const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-        const result = reader.decode(bitmap);
-        return [{ rawValue: result.getText() }];
+        return [{ rawValue: reader.decode(bitmap).getText() }];
       } catch {
         // Aucun code sur cette image : cas courant, pas une erreur.
         return [];

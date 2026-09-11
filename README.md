@@ -187,6 +187,21 @@ même réponse.
 
 Formats lus : EAN-13, EAN-8, UPC-A, UPC-E, Code 128, ITF.
 
+### Si le code est difficile à lire
+
+Le décodeur n'analyse que le rectangle du viseur, à la définition du capteur :
+cadrez le code dedans plutôt que de coller le téléphone sur la boîte.
+
+Un code flou reste illisible, quel que soit le traitement — l'information
+n'est pas dans l'image. L'application agit donc sur la prise de vue :
+
+- **autofocus continu** demandé à la caméra dès l'ouverture ;
+- **toucher l'aperçu** refait la mise au point à cet endroit, utile quand le
+  téléphone s'obstine à viser l'arrière-plan ;
+- **bouton d'éclairage** en bas à droite quand l'appareil le permet : en
+  faible lumière, le capteur allonge le temps de pose et le moindre mouvement
+  devient flou.
+
 ---
 
 ## Configuration

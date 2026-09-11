@@ -519,6 +519,108 @@ async function refresh({ withMeta = false } = {}) {
    Scanner de codes-barres
    ========================================================================== */
 
+/*
+ * Zone analysee, en fractions de l'apercu. Le viseur affiche exactement ce
+ * rectangle : c'est la meme source pour le trait a l'ecran et pour l'image
+ * envoyee au decodeur, faute de quoi l'utilisateur viserait a cote.
+ */
+const RETICULE = { left: 0.06, top: 0.28, width: 0.88, height: 0.44 };
+
+/** Largeur maximale analysee : au-dela, le cout grimpe sans gain de lecture. */
+const LARGEUR_ANALYSE_MAX = 1600;
+
+/**
+ * Decoupe la zone du viseur dans l'image de la camera, a la resolution du
+ * capteur. L'apercu etant affiche en `cover`, une partie de l'image deborde
+ * du cadre : il faut retrouver la portion reellement visible avant d'y
+ * appliquer les fractions du viseur.
+ */
+function cropScanArea(video, frame, canvas) {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return null;
+
+  const bw = frame.clientWidth;
+  const bh = frame.clientHeight;
+  const echelle = Math.max(bw / vw, bh / vh);
+  const visibleW = bw / echelle;
+  const visibleH = bh / echelle;
+  const originX = (vw - visibleW) / 2;
+  const originY = (vh - visibleH) / 2;
+
+  const sx = originX + visibleW * RETICULE.left;
+  const sy = originY + visibleH * RETICULE.top;
+  const sw = visibleW * RETICULE.width;
+  const sh = visibleH * RETICULE.height;
+
+  const reduction = Math.min(1, LARGEUR_ANALYSE_MAX / sw);
+  canvas.width = Math.max(1, Math.round(sw * reduction));
+  canvas.height = Math.max(1, Math.round(sh * reduction));
+  canvas.getContext('2d', { willReadFrequently: true })
+    .drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/**
+ * Reglages de prise de vue disponibles selon l'appareil : mise au point
+ * continue, mise au point sur un point precis, eclairage. Tous sont
+ * optionnels et silencieusement ignores quand la camera ne les propose pas.
+ */
+async function setupCameraControls(track, modal, status) {
+  const caps = track.getCapabilities?.() ?? {};
+
+  // Sans autofocus continu, le telephone fait souvent le point sur
+  // l'arriere-plan et le code reste flou tant qu'on ne bouge pas.
+  if (caps.focusMode?.includes('continuous')) {
+    try {
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    } catch { /* refuse : on garde le reglage par defaut */ }
+  }
+
+  // Toucher l'apercu refait le point a cet endroit.
+  const frame = modal.$('#scanner-frame');
+  const peutViser = caps.pointsOfInterest || caps.focusMode?.includes('single-shot');
+  if (peutViser) {
+    frame.classList.add('focusable');
+    frame.addEventListener('click', async (event) => {
+      const rect = frame.getBoundingClientRect();
+      const advanced = [];
+      if (caps.pointsOfInterest) {
+        advanced.push({
+          pointsOfInterest: [{
+            x: (event.clientX - rect.left) / rect.width,
+            y: (event.clientY - rect.top) / rect.height,
+          }],
+        });
+      }
+      if (caps.focusMode?.includes('single-shot')) advanced.push({ focusMode: 'single-shot' });
+      try {
+        await track.applyConstraints({ advanced });
+        status.textContent = 'Mise au point…';
+      } catch { /* sans effet sur cet appareil */ }
+    });
+  }
+
+  // En faible lumiere, le capteur allonge le temps de pose et le moindre
+  // mouvement devient flou : l'eclairage regle le probleme a la source.
+  if (caps.torch) {
+    const bouton = modal.$('#btn-torch');
+    bouton.hidden = false;
+    let allume = false;
+    bouton.addEventListener('click', async () => {
+      try {
+        await track.applyConstraints({ advanced: [{ torch: !allume }] });
+        allume = !allume;
+        bouton.classList.toggle('on', allume);
+      } catch {
+        toast('Éclairage indisponible', 'error');
+      }
+    });
+  }
+
+  return { peutViser, torche: Boolean(caps.torch) };
+}
+
 /**
  * Ouvre la modale de scan. `onDetect(code)` recoit le code lu ; s'il renvoie
  * true, la modale se ferme. Sans callback, on interroge la collection.
@@ -594,8 +696,15 @@ async function openScanModal({ onDetect } = {}) {
     status.textContent = 'Préparation du lecteur…';
     // La camera est demandee en premier : c'est elle qui declenche la
     // demande d'autorisation, et le geste de l'utilisateur est encore frais.
+    // Une definition elevee laisse davantage de pixels sur le code une fois
+    // la zone du viseur decoupee. `ideal` plutot qu'`exact` : un appareil qui
+    // ne sait pas faire renvoie sa meilleure definition au lieu d'echouer.
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
     });
     if (stopped) {
       stream.getTracks().forEach((track) => track.stop());
@@ -604,17 +713,32 @@ async function openScanModal({ onDetect } = {}) {
     video.srcObject = stream;
     await video.play();
 
+    const track = stream.getVideoTracks()[0];
+    const controles = await setupCameraControls(track, modal, status);
+
+    // Le viseur affiche exactement la zone analysee.
+    const frame = modal.$('#scanner-frame');
+    const reticule = modal.$('.scanner-reticle');
+    reticule.style.left = `${RETICULE.left * 100}%`;
+    reticule.style.top = `${RETICULE.top * 100}%`;
+    reticule.style.right = `${(1 - RETICULE.left - RETICULE.width) * 100}%`;
+    reticule.style.bottom = `${(1 - RETICULE.top - RETICULE.height) * 100}%`;
+
     // Safari n'a pas d'API de lecture : createBarcodeDetector retombe alors
     // sur le decodeur embarque, telecharge a cet instant seulement.
     const detector = await createBarcodeDetector();
     if (stopped) return;
-    status.textContent = 'Visez le code-barres au dos du boîtier.';
+    status.textContent = controles.peutViser
+      ? 'Cadrez le code dans le rectangle. Touchez l’image pour refaire le point.'
+      : 'Cadrez le code-barres dans le rectangle.';
 
+    const canvas = document.createElement('canvas');
     let lastCode = '';
     const tick = async () => {
       if (stopped) return;
       try {
-        const codes = await detector.detect(video);
+        const zone = cropScanArea(video, frame, canvas);
+        const codes = zone ? await detector.detect(zone) : [];
         const code = codes[0]?.rawValue;
         if (code && code !== lastCode) {
           lastCode = code;
@@ -630,7 +754,10 @@ async function openScanModal({ onDetect } = {}) {
       } catch {
         /* image illisible sur cette frame : on retente */
       }
-      if (!stopped) setTimeout(tick, 250);
+      // Analyser une zone reduite coute bien moins cher qu'une image entiere :
+      // on peut tenter plus souvent, ce qui multiplie les chances de tomber
+      // sur une image nette pendant que la main bouge.
+      if (!stopped) setTimeout(tick, 90);
     };
     tick();
   } catch (err) {

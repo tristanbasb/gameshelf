@@ -1100,14 +1100,34 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   place-items: center;
 }
 .scanner video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Position posee par le script : le viseur doit coincider exactement avec la
+   zone envoyee au decodeur (RETICULE dans app.js). */
 .scanner-reticle {
   position: absolute;
-  left: 8%; right: 8%; top: 32%; bottom: 32%;
+  left: 6%; right: 6%; top: 28%; bottom: 28%;
   border: 2px solid rgba(255, 255, 255, 0.85);
   border-radius: 10px;
   box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
+
+/* Indique que toucher l'image refait la mise au point. */
+.scanner.focusable { cursor: crosshair; }
+
+.torch-btn {
+  position: absolute;
+  right: 10px; bottom: 10px;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+}
+.torch-btn.on { background: var(--warning); color: #1a1205; border-color: transparent; }
 .scanner-status {
   margin: 10px 0 0;
   font-size: 12.5px;
