@@ -57,7 +57,7 @@
   --sidebar-w: 256px;
   --header-h: 64px;
   --bar-h: 56px;
-  --card-h: 320px;
+  --card-h: 252px;
 
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
@@ -507,7 +507,7 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 12px;
 }
 
@@ -518,136 +518,136 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 }
 
 /*
- * La fiche est une vignette pleine : l'image — ou, a defaut, une initiale en
- * filigrane — occupe toute la surface, et les informations se posent dessus
- * sur un degrade. Rien n'est laisse vide, meme sans jaquette.
+ * Vitrine : la fiche est une tuille de jaquette, rien d'autre. Les
+ * informations se posent dessus sous un voile, et ne prennent la place de
+ * personne. C'est l'objet que l'on collectionne qui occupe l'ecran.
+ *
+ * Le prix de ce parti pris est que tout repose sur la jaquette. Quand elle
+ * manque — et c'est le cas de presque toute la collection — une jaquette est
+ * fabriquee a partir du titre (voir .cover-genere) : sans cela, la grille ne
+ * serait qu'un mur de rectangles vides.
  */
 .card {
   position: relative;
-  height: var(--card-h);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-md);
   overflow: hidden;
+  background: #101018;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.22s;
+  isolation: isolate;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
   content-visibility: auto;
-  contain-intrinsic-size: auto var(--card-h);
+  contain-intrinsic-size: auto 260px;
 }
 .card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 12px 24px -10px rgba(124, 58, 237, 0.22),
-              0 0 0 1px rgba(139, 92, 246, 0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.8),
+              0 0 0 1px rgba(255, 255, 255, 0.14);
+  z-index: 2;
 }
+.card:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 3px; }
 
-.card-media {
+.card-media { position: absolute; inset: 0; }
+
+/* `cover` remplit la tuile en rognant les bords — c'est le parti pris de la
+   vitrine. Passer a `contain` montre la jaquette entiere, au prix de bandes
+   sur les cotes : un seul mot a changer ici. */
+.cover-main {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: var(--ajustement-jaquette, cover);
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card:hover .cover-main { transform: scale(1.06); }
+
+/*
+ * Jaquette fabriquee, pour les exemplaires sans visuel.
+ *
+ * La teinte est tiree du titre : le meme jeu garde toujours la meme couleur,
+ * et deux jeux voisins dans la grille en ont rarement une proche. Le titre
+ * lui-meme est compose grand, en trois mots au plus. L'ensemble se lit comme
+ * une pochette, pas comme une case en attente d'image.
+ */
+.cover-genere {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom right, #182136, #0f1424);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  /* Le titre fabrique se compose en haut : le bas de la tuile appartient au
+     voile et au titre reel, les deux se superposeraient sinon. */
+  padding: 38px 14px 14px;
+  background:
+    radial-gradient(120% 90% at 78% 12%, hsl(var(--teinte) 62% 46% / 0.55) 0%, transparent 58%),
+    linear-gradient(148deg, hsl(var(--teinte) 48% 30%) 0%, hsl(calc(var(--teinte) + 42) 52% 13%) 100%);
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card:hover .cover-genere { transform: scale(1.04); }
+.cover-genere span {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: clamp(15px, 1.55vw, 20px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.94);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  hyphens: auto;
 }
-[data-theme="light"] .card-media {
-  background: linear-gradient(to bottom right, #eef1f8, #e3e8f4);
+[data-theme="light"] .cover-genere {
+  background:
+    radial-gradient(120% 90% at 78% 12%, hsl(var(--teinte) 70% 62% / 0.6) 0%, transparent 58%),
+    linear-gradient(148deg, hsl(var(--teinte) 55% 52%) 0%, hsl(calc(var(--teinte) + 42) 58% 32%) 100%);
 }
-/*
- * La jaquette est affichee en entier (contain) : rien n'est rogne. Un retrait
- * la decolle des bords, ce qui la fait respirer sans la reduire beaucoup.
- * Ajustez --cover-inset pour la montrer plus grande ou plus petite.
- */
-.card { --cover-inset: 10px; }
 
-.card-media .cover-main {
-  display: block;
-  position: absolute;
-  inset: var(--cover-inset);
-  width: calc(100% - var(--cover-inset) * 2);
-  height: calc(100% - var(--cover-inset) * 2);
-  object-fit: contain;
-  object-position: center top;
-  transition: transform 0.3s ease;
-}
-.card:hover .card-media .cover-main { transform: scale(1.03); }
-
-/* Initiale en filigrane, quand aucune jaquette n'est renseignee */
-.watermark {
-  position: absolute;
-  top: 34px;
-  right: 8px;
-  font-size: 86px;
-  font-weight: 900;
-  line-height: 1;
-  color: rgba(71, 85, 105, 0.3);
-  user-select: none;
-  pointer-events: none;
-  transition: color 0.3s, transform 0.3s;
-}
-.card:hover .watermark { color: rgba(139, 92, 246, 0.4); transform: scale(1.1); }
-
-/*
- * Voile de lisibilite du texte. Il est confine au bas de la fiche : plus il
- * remonte, plus il mange la jaquette qu'on cherche justement a montrer.
- */
+/* Voile de lisibilite, confine au bas de la tuile. */
 .card-scrim {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     to top,
-    var(--bg) 0%,
-    rgba(9, 13, 22, 0.82) 20%,
-    rgba(9, 13, 22, 0.35) 38%,
-    transparent 54%
+    rgba(0, 0, 0, 0.94) 0%,
+    rgba(0, 0, 0, 0.62) 24%,
+    rgba(0, 0, 0, 0.12) 46%,
+    transparent 62%
   );
   pointer-events: none;
-}
-[data-theme="light"] .card-scrim {
-  background: linear-gradient(
-    to top,
-    #ffffff 0%,
-    rgba(255, 255, 255, 0.88) 20%,
-    rgba(255, 255, 255, 0.4) 38%,
-    transparent 54%
-  );
 }
 
 .card-top {
   position: absolute;
-  top: 0; left: 0; right: 0;
-  padding: 10px;
+  top: 8px; left: 8px; right: 8px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
+  z-index: 1;
 }
 
 .card-bottom {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 10px 11px 11px;
+  z-index: 1;
 }
 
 .card-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-strong);
-  line-height: 1.3;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #fff;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 0.15s;
 }
-.card:hover .card-title { color: var(--accent-text); }
 
 .card-sub {
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: var(--text-muted);
+  margin: 3px 0 0;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.62);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -655,88 +655,85 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.card-sub .sep { color: var(--text-faint); font-size: 9px; }
+.card-sub .dot { width: 5px; height: 5px; flex: none; }
 
-.card-foot {
+/*
+ * Le detail de ce qui manque n'apparait qu'au survol : la tuile reste une
+ * image tant qu'on la parcourt, et livre l'inventaire des qu'on s'y arrete.
+ * Sur telephone, ou le survol n'existe pas, la pastille du haut suffit et le
+ * reste est dans la fiche.
+ */
+.card-parts {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-soft);
+  gap: 3px;
+  margin-top: 7px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s, transform 0.2s;
 }
+.card:hover .card-parts, .card:focus-within .card-parts { opacity: 1; transform: none; }
+.part-chip {
+  flex: 1;
+  text-align: center;
+  padding: 2px 0;
+  border-radius: 4px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+}
+.part-chip.ok { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3); }
+.part-chip.ko { background: rgba(245, 158, 11, 0.22); color: #fcd34d; border-color: rgba(245, 158, 11, 0.35); }
+@media (hover: none) { .card-parts { display: none; } }
 
-/* Pastilles posees sur la vignette */
+/* --- Pastilles posees sur la tuile --- */
+
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  backdrop-filter: blur(4px);
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tag .dot { width: 6px; height: 6px; box-shadow: none; }
+.tag .dot { width: 5px; height: 5px; box-shadow: none; }
 
-.tag-region {
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: rgba(0, 0, 0, 0.6);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
-  font-weight: 700;
-}
-[data-theme="light"] .tag-region {
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--text);
-}
-
-.tag-ok {
-  background: rgba(52, 211, 153, 0.18);
-  color: #6ee7b7;
-  border: 1px solid rgba(52, 211, 153, 0.3);
-}
-.tag-missing {
-  background: rgba(244, 63, 94, 0.2);
-  color: #fda4af;
-  border: 1px solid var(--danger-border);
-  border-radius: 5px;
-}
-.tag-qty {
-  background: rgba(124, 58, 237, 0.85);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 5px;
-  font-weight: 700;
-}
-[data-theme="light"] .tag-ok { color: #047857; }
-[data-theme="light"] .tag-missing { color: #be123c; }
-
-/* Pastille d'etat, coloree par --cond */
-.tag-cond {
-  background: color-mix(in srgb, var(--cond) 20%, transparent);
-  color: var(--cond);
-  border: 1px solid color-mix(in srgb, var(--cond) 32%, transparent);
-}
+.tag-region { color: rgba(255, 255, 255, 0.8); }
+.tag-ok { color: #6ee7b7; }
+/* Seul ce qui cloche prend de la couleur : une grille de tuiles completes
+   reste calme, et l'oeil tombe sur les manques. */
+.tag-missing { background: rgba(180, 83, 9, 0.72); color: #fde68a; }
+.tag-qty { background: rgba(79, 70, 229, 0.8); color: #fff; }
+.tag-cond { color: var(--cond); }
 
 .fav-btn {
-  width: 24px; height: 24px;
+  width: 26px; height: 26px;
   flex: none;
   display: grid; place-items: center;
   border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  opacity: 0;
+  transition: color 0.15s, background 0.15s, opacity 0.2s;
 }
-.fav-btn:hover { color: var(--text-strong); background: rgba(148, 163, 184, 0.15); }
+.card:hover .fav-btn, .card:focus-within .fav-btn, .fav-btn.on { opacity: 1; }
+.fav-btn:hover { color: #fff; background: rgba(0, 0, 0, 0.75); }
 .fav-btn.on { color: var(--warning); }
+@media (hover: none) { .fav-btn { opacity: 1; } }
 
 /* --------------------------------------------------------------------------
    Vue tableau
@@ -801,11 +798,11 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
 
 .skeleton-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 12px;
 }
 .skeleton {
-  height: var(--card-h);
+  aspect-ratio: 3 / 4;
   border-radius: var(--radius);
   background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 37%, var(--surface) 63%);
   background-size: 400% 100%;
@@ -916,11 +913,9 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   object-fit: contain;
   padding: 10px;
 }
-.detail-media .watermark {
-  position: static;
-  font-size: 76px;
-  color: rgba(71, 85, 105, 0.35);
-}
+/* La jaquette fabriquee occupe la meme place qu une vraie. */
+.detail-media .cover-genere { padding: 18px 18px 22px; }
+.detail-media .cover-genere span { font-size: 24px; }
 
 .detail-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
@@ -1260,7 +1255,7 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
 /* Sur telephone, la recherche passe sur sa propre ligne : elle devenait
    illisible, coincee entre le menu et quatre boutons. */
 @media (max-width: 700px) {
-  :root { --header-h: 108px; --card-h: 268px; }
+  :root { --header-h: 108px; --card-h: 210px; }
 
   .topbar {
     flex-wrap: wrap;
@@ -1285,8 +1280,7 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   .toolbar-title { flex: 1 1 100%; min-width: 0; }
   .toolbar-actions { flex: 1 1 100%; min-width: 0; justify-content: space-between; }
   .toolbar .select { flex: 1 1 0; min-width: 0; }
-  .grid, .skeleton-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .watermark { font-size: 68px; }
+  .grid, .skeleton-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
 
 @media (max-width: 560px) {

@@ -70,10 +70,10 @@ export const CONDITION_COLORS = {
 
 /** Elements suivis dans un exemplaire, dans l'ordre d'affichage. */
 export const PARTS = [
-  { key: 'has_box', label: 'Boîte', missing: 'boîte' },
-  { key: 'has_cover_art', label: 'Jaquette papier', missing: 'jaquette' },
-  { key: 'has_manual', label: 'Notice', missing: 'notice' },
-  { key: 'has_disc', label: 'Disque / cartouche', missing: 'disque' },
+  { key: 'has_box', label: 'Boîte', missing: 'boîte', court: 'BOÎTE' },
+  { key: 'has_cover_art', label: 'Jaquette papier', missing: 'jaquette', court: 'JAQ.' },
+  { key: 'has_manual', label: 'Notice', missing: 'notice', court: 'NOT.' },
+  { key: 'has_disc', label: 'Disque / cartouche', missing: 'disque', court: 'DISQ.' },
 ];
 
 /** Liste des elements absents d'un exemplaire (vide s'il est complet). */

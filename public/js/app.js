@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { createBarcodeDetector } from './barcode.js';
 import {
-  $, $$, esc, toast, openModal, confirmDialog, debounce, initial, store,
+  $, $$, esc, toast, openModal, confirmDialog, debounce, store,
   CONDITION_LABELS, CONDITION_SHORT, CONDITION_COLORS,
   PARTS, missingParts, fmtNumber, fmtDate, copyText,
 } from './ui.js';
@@ -213,28 +213,57 @@ function renderChips() {
 const STAR_PATH = 'm12 17.3-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z';
 
 /**
- * Fond d'une fiche : la jaquette si elle existe, sinon l'initiale du titre en
- * filigrane. Les images cassees retombent sur ce filigrane, l'evenement
+ * Teinte d'une jaquette fabriquee, tiree du titre.
+ *
+ * Le calcul est volontairement simple et stable : le meme jeu garde toujours
+ * la meme couleur, d'une session a l'autre et d'un appareil a l'autre. C'est
+ * ce qui permet de retrouver un exemplaire a sa couleur dans la grille, comme
+ * on retrouve une boite a sa tranche sur une etagere.
+ */
+function teinteDuTitre(titre) {
+  let somme = 0;
+  for (let i = 0; i < titre.length; i += 1) {
+    somme = (somme * 31 + titre.charCodeAt(i)) % 360;
+  }
+  return somme;
+}
+
+/**
+ * Jaquette fabriquee a partir du seul titre, pour les exemplaires sans visuel.
+ *
+ * La vitrine repose entierement sur l'image ; laisser un cadre vide reviendrait
+ * a la vider de son propos. Trois mots au plus, composes grand sur un degrade :
+ * cela se lit comme une pochette, et non comme une case en attente.
+ */
+function coverGeneree(titre) {
+  const texte = String(titre || '?').trim() || '?';
+  // Le titre est compose entier et coupe a trois lignes par le style : le
+  // decouper ici en mots donnait des morceaux absurdes — « The Fast and ».
+  return `<div class="cover-genere" style="--teinte:${teinteDuTitre(texte)}"
+    ><span>${esc(texte)}</span></div>`;
+}
+
+/**
+ * Fond d'une tuile : la jaquette si elle existe, sinon celle que l'on
+ * fabrique. Les images cassees retombent sur la meme fabrique, l'evenement
  * `error` etant capture au niveau du conteneur (voir bindEvents) — un
  * gestionnaire en ligne serait bloque par la CSP.
  */
 function mediaMarkup(game) {
   if (game.cover_url) {
     return `<img class="cover-main" src="${esc(game.cover_url)}" alt="" loading="lazy"
-      data-initial="${esc(initial(game.title))}">`;
+      data-titre="${esc(game.title)}">`;
   }
-  return `<span class="watermark">${esc(initial(game.title))}</span>`;
+  return coverGeneree(game.title);
 }
 
-/** Pastille de completude, en haut a gauche de la fiche. */
-function completenessTag(game) {
-  const missing = missingParts(game);
-  if (missing.length === 0) {
-    return `<span class="tag tag-ok">
-      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      Complet</span>`;
-  }
-  return `<span class="tag tag-missing" title="Éléments manquants : ${esc(missing.join(', '))}">sans ${esc(missing.join(', '))}</span>`;
+/** Les quatre elements d'un exemplaire, reveles au survol de la tuile. */
+function partChips(game) {
+  return PARTS.map((part) => {
+    const present = Boolean(game[part.key]);
+    return `<span class="part-chip ${present ? 'ok' : 'ko'}"
+      title="${esc(part.label)} : ${present ? 'présente' : 'absente'}">${esc(part.court)}</span>`;
+  }).join('');
 }
 
 function gameCard(game) {
@@ -246,12 +275,8 @@ function gameCard(game) {
   card.setAttribute('aria-label', `Voir la fiche de ${game.title}`);
 
   const favLabel = game.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris';
-  const condition = game.condition
-    ? `<span class="tag tag-cond" style="--cond:${CONDITION_COLORS[game.condition]}">
-         <span class="dot" style="background:${CONDITION_COLORS[game.condition]}"></span>
-         ${esc(CONDITION_SHORT[game.condition])}
-       </span>`
-    : '<span class="tag" style="color:var(--text-faint)">État non renseigné</span>';
+  const manque = missingParts(game);
+  const couleur = CONDITION_COLORS[game.condition] || 'var(--text-faint)';
 
   card.innerHTML = `
     <div class="card-media">
@@ -260,31 +285,33 @@ function gameCard(game) {
     </div>
 
     <div class="card-top">
-      ${completenessTag(game)}
-      <span style="display:flex;gap:5px;flex:none">
-        ${game.quantity > 1 ? `<span class="tag tag-qty" title="${game.quantity} exemplaires">×${game.quantity}</span>` : ''}
+      <span style="display:flex;gap:5px;min-width:0">
         ${game.region ? `<span class="tag tag-region">${esc(game.region)}</span>` : ''}
+        ${manque.length
+          ? `<span class="tag tag-missing" title="Manque : ${esc(manque.join(', '))}"
+              >${PARTS.length - manque.length}/${PARTS.length}</span>`
+          : ''}
+        ${game.quantity > 1
+          ? `<span class="tag tag-qty" title="${game.quantity} exemplaires">×${game.quantity}</span>`
+          : ''}
       </span>
+      <button class="fav-btn${game.favorite ? ' on' : ''}" data-fav="${game.id}"
+              title="${favLabel}" aria-label="${favLabel}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="${game.favorite ? 'currentColor' : 'none'}"
+             stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+          <path d="${STAR_PATH}"/>
+        </svg>
+      </button>
     </div>
 
     <div class="card-bottom">
-      <div>
-        <h3 class="card-title" title="${esc(game.title)}">${esc(game.title)}</h3>
-        <p class="card-sub">
-          <span>${esc(game.platform) || 'Plateforme inconnue'}</span>
-          ${game.serial ? `<span class="sep">•</span><span>${esc(game.serial)}</span>` : ''}
-        </p>
-      </div>
-      <div class="card-foot">
-        ${condition}
-        <button class="fav-btn${game.favorite ? ' on' : ''}" data-fav="${game.id}"
-                title="${favLabel}" aria-label="${favLabel}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="${game.favorite ? 'currentColor' : 'none'}"
-               stroke="currentColor" stroke-width="2" stroke-linejoin="round">
-            <path d="${STAR_PATH}"/>
-          </svg>
-        </button>
-      </div>
+      <h3 class="card-title" title="${esc(game.title)}">${esc(game.title)}</h3>
+      <p class="card-sub">
+        <span class="dot" style="background:${couleur}"></span>
+        <span>${esc(CONDITION_SHORT[game.condition] ?? '—')}</span>
+        ${game.platform ? `<span>·</span><span>${esc(game.platform)}</span>` : ''}
+      </p>
+      <div class="card-parts">${partChips(game)}</div>
     </div>`;
   return card;
 }
@@ -797,7 +824,7 @@ function openDetailModal(game) {
   // --- Visuel -------------------------------------------------------------
   modal.$('#detail-media').innerHTML = game.cover_url
     ? `<img src="${esc(game.cover_url)}" alt="Jaquette de ${esc(game.title)}">`
-    : `<span class="watermark">${esc(initial(game.title))}</span>`;
+    : coverGeneree(game.title);
 
   // --- Identite -----------------------------------------------------------
   modal.$('#detail-name').textContent = game.title;
@@ -1336,7 +1363,7 @@ function bindEvents() {
     refresh();
   });
 
-  // Visuel introuvable : on retombe sur l'initiale du titre.
+  // Visuel introuvable : on retombe sur la jaquette fabriquee.
   // L'evenement `error` d'une image ne remonte pas : on ecoute en capture.
   $('#games-container').addEventListener(
     'error',
@@ -1347,10 +1374,7 @@ function bindEvents() {
         img.removeAttribute('src');
         return;
       }
-      const watermark = document.createElement('span');
-      watermark.className = 'watermark';
-      watermark.textContent = img.dataset.initial || '?';
-      img.replaceWith(watermark);
+      img.outerHTML = coverGeneree(img.dataset.titre || '');
     },
     true,
   );
