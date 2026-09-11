@@ -1167,6 +1167,19 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   cursor: pointer;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
 }
+/* Le recours principal quand l'apercu peine : il doit se voir et se toucher
+   sans viser, d'ou la pleine largeur et la hauteur d'un bouton de pouce. */
+.scan-photo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+}
+
 .scanner-status {
   margin: 10px 0 0;
   font-size: 12.5px;

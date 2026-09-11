@@ -92,6 +92,15 @@ if [[ -n "$CREATED_ID" ]]; then
   # le scan le retrouve et que le filtre "incomplets" le remonte.
   contains "/api/lookup retrouve le jeu par son code-barres" \
     "$(curl -sk "$BASE_URL/api/lookup?ean=3307219999999")" '"found":true'
+  # Une etiquette UPC-A a douze chiffres vaut l'EAN-13 prefixe d'un zero :
+  # selon qu'il a ete saisi ou scanne, l'un ou l'autre est en base.
+  upc_id=$(curl -sk -X POST -H 'Content-Type: application/json' \
+    -d '{"title":"__smoke_upc__","ean":"0123456789012"}' "$BASE_URL/api/games" \
+    | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+  contains "/api/lookup : un code UPC-A a 12 chiffres retrouve l EAN-13" \
+    "$(curl -sk "$BASE_URL/api/lookup?ean=123456789012")" '__smoke_upc__'
+  curl -sk -X DELETE "$BASE_URL/api/games/$upc_id" >/dev/null
+
   contains "filtre incomplete=1 remonte le jeu sans notice" \
     "$(curl -sk "$BASE_URL/api/games?incomplete=1&search=__smoke_test__")" '__smoke_test__'
   contains "recherche par serial" \

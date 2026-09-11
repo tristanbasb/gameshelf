@@ -663,6 +663,63 @@ function setupCameraControls(track, modal, status) {
   return { peutViser: Boolean(peutViser), torche: Boolean(caps.torch) };
 }
 
+/*
+ * Cadrages essayes sur une photo, dans l'ordre. `part` est la fraction
+ * conservee autour du centre, `largeur` la definition d'analyse.
+ *
+ * Contrairement a l'apercu video, ou il faut decoder vingt images par
+ * seconde, une photo n'est lue qu'une fois : on peut y mettre le prix. Et
+ * il le faut. Mesure sur des photos de synthese de 4032 pixels, le code
+ * occupant de 8 a 70 % de la largeur : reduite a 1024, l'image a produit un
+ * code faux dont la clef de controle tombait juste — le genre d'erreur qui
+ * fait repartir avec un jeu que l'on possede deja. A 2200 et au-dela, plus
+ * aucune lecture fausse, et tout ce qui depasse 10 % de la largeur est lu.
+ */
+const CADRAGES_PHOTO = [
+  { part: 1, largeur: 2200 },
+  { part: 1, largeur: 4032 },
+  { part: 0.6, largeur: 2400 },
+];
+
+/**
+ * Cherche un code-barres sur une photo. Renvoie le code, ou null si aucun
+ * cadrage n'a rien donne.
+ */
+async function lireCodeSurPhoto(fichier, lecteur) {
+  let source;
+  try {
+    // Sans cette option, une photo prise en portrait arrive parfois couchee :
+    // ses pixels sont stockes a plat, l'orientation n'etant qu'une etiquette.
+    source = await createImageBitmap(fichier, { imageOrientation: 'from-image' });
+  } catch {
+    source = await createImageBitmap(fichier);
+  }
+
+  try {
+    for (const { part, largeur } of CADRAGES_PHOTO) {
+      const sw = source.width * part;
+      const sh = source.height * part;
+      const reduction = Math.min(1, largeur / sw);
+      const vignette = await createImageBitmap(
+        source,
+        (source.width - sw) / 2,
+        (source.height - sh) / 2,
+        sw,
+        sh,
+      );
+      const codes = await lecteur.detect(
+        vignette,
+        Math.max(1, Math.round(sw * reduction)),
+        Math.max(1, Math.round(sh * reduction)),
+      );
+      if (codes[0]?.rawValue) return codes[0].rawValue;
+    }
+    return null;
+  } finally {
+    source.close?.();
+  }
+}
+
 /**
  * Ouvre la modale de scan. `onDetect(code)` recoit le code lu ; s'il renvoie
  * true, la modale se ferme. Sans callback, on interroge la collection.
@@ -671,6 +728,24 @@ async function openScanModal({ onDetect } = {}) {
   let stopped = false;
   let stream = null;
   let detecteur = null;
+  let detecteurPromesse = null;
+
+  /*
+   * Un seul decodeur pour la modale entiere : l'apercu video et la photo s'en
+   * partagent un, charge au premier des deux qui en a besoin. Il pese 350 Ko
+   * et ouvre un worker — en ouvrir deux serait un gaspillage pur.
+   */
+  const obtenirLecteur = () => {
+    detecteurPromesse ??= createBarcodeDetector().then((lecteur) => {
+      if (stopped) {
+        lecteur.close();
+        return null;
+      }
+      detecteur = lecteur;
+      return lecteur;
+    });
+    return detecteurPromesse;
+  };
 
   const stopCamera = () => {
     stopped = true;
@@ -710,6 +785,43 @@ async function openScanModal({ onDetect } = {}) {
     }
   });
 
+  /*
+   * Lecture sur photo. C'est l'appareil photo du systeme qui prend l'image,
+   * avec tout ce que le navigateur ne sait pas faire du flux video : mise au
+   * point macro, stabilisation, pleine definition. Un code y occupe dix fois
+   * plus de pixels, et rien n'a besoin d'etre net au bon millieme de seconde.
+   *
+   * Seul un champ de fichier est en jeu : aucune permission camera, et cela
+   * fonctionne meme en HTTP simple, la ou l'apercu video est refuse.
+   */
+  const champPhoto = modal.$('#scan-photo');
+  champPhoto.addEventListener('change', async () => {
+    const fichier = champPhoto.files?.[0];
+    // Vider le champ tout de suite : reprendre deux fois la meme boite doit
+    // relancer la lecture, or a valeur identique aucun evenement ne part.
+    champPhoto.value = '';
+    if (!fichier) return;
+
+    status.textContent = 'Lecture de la photo…';
+    try {
+      const lecteur = await obtenirLecteur();
+      if (!lecteur) return;
+      const code = await lireCodeSurPhoto(fichier, lecteur);
+      if (!code) {
+        status.textContent =
+          'Aucun code-barres sur cette photo. Reprenez-la de plus près, '
+          + 'le code bien à plat et entier dans l’image.';
+        return;
+      }
+      navigator.vibrate?.(60);
+      modal.$('#scan-manual').value = code;
+      status.textContent = `Code ${code} : recherche…`;
+      await handle(code);
+    } catch (err) {
+      status.textContent = `Photo illisible : ${err.message}`;
+    }
+  });
+
   // --- Disponibilite de la camera -------------------------------------------
   if (!window.isSecureContext) {
     // Sur un reseau local, l'application sert aussi en HTTPS auto-signe : on
@@ -721,23 +833,23 @@ async function openScanModal({ onDetect } = {}) {
       status.innerHTML =
         'La caméra exige une connexion sécurisée.<br>'
         + `Ouvrez plutôt <a href="${esc(secureUrl)}">${esc(secureUrl)}</a>`
-        + ' et acceptez l’avertissement de certificat, ou saisissez le code ci-dessous.';
+        + ' et acceptez l’avertissement de certificat.<br>'
+        + 'La photo, elle, fonctionne d’ici.';
     } else {
       status.textContent =
         'La caméra exige une connexion sécurisée (HTTPS ou localhost). '
-        + 'Saisissez le code ci-dessous.';
+        + 'Photographiez le code, ou saisissez-le ci-dessous.';
     }
     modal.$('#scanner-frame').hidden = true;
-    modal.$('#scan-manual').focus();
     return;
   }
   // `createImageBitmap` sert a decouper le viseur sans bloquer l'affichage :
   // sans lui, autant l'annoncer que de laisser un apercu qui ne lit rien.
   if (!navigator.mediaDevices?.getUserMedia || typeof createImageBitmap !== 'function') {
     status.textContent =
-      "Ce navigateur ne donne pas accès à la caméra. Saisissez le code à la main.";
+      "Ce navigateur ne donne pas accès à la caméra en direct. "
+      + "Photographiez le code, ou saisissez-le à la main.";
     modal.$('#scanner-frame').hidden = true;
-    modal.$('#scan-manual').focus();
     return;
   }
 
@@ -749,7 +861,7 @@ async function openScanModal({ onDetect } = {}) {
      * capteur d'un cote, 350 Ko de decodeur de l'autre : les mener de front
      * economise l'attente la plus courte des deux.
      */
-    const lecteurPret = createBarcodeDetector().then(
+    const lecteurPret = obtenirLecteur().then(
       (lecteur) => ({ lecteur }),
       (erreur) => ({ erreur }),
     );
@@ -788,11 +900,9 @@ async function openScanModal({ onDetect } = {}) {
     // sur le decodeur embarque, mis en route pendant le demarrage camera.
     const { lecteur, erreur } = await lecteurPret;
     if (erreur) throw erreur;
-    if (stopped) {
-      lecteur.close();
-      return;
-    }
-    detecteur = lecteur;
+    // Nul quand la modale s'est fermee entre-temps : le lecteur a deja ete
+    // rendu par `obtenirLecteur`, il n'y a plus rien a faire ici.
+    if (!lecteur || stopped) return;
 
     let lastCode = '';
     status.textContent = controles.peutViser

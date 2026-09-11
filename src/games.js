@@ -44,6 +44,23 @@ export function normalizeEan(value) {
   return digits;
 }
 
+/**
+ * Ecritures equivalentes d'un meme code-barres.
+ *
+ * Une etiquette americaine porte douze chiffres (UPC-A), la meme referencee
+ * en Europe en porte treize, le premier etant un zero : c'est le meme code.
+ * Selon qu'il a ete saisi depuis la boite ou lu par l'appareil, l'un ou
+ * l'autre se retrouve en base, et chercher a l'identique repondrait « pas
+ * dans votre collection » pour un jeu qui s'y trouve — le pire des
+ * resultats devant un rayon.
+ */
+export function eanVariants(ean) {
+  const formes = new Set([ean]);
+  if (ean.length === 13 && ean.startsWith('0')) formes.add(ean.slice(1));
+  if (ean.length === 12) formes.add(`0${ean}`);
+  return [...formes];
+}
+
 export function normalizeTags(value) {
   const list = Array.isArray(value) ? value : String(value ?? '').split(',');
   const seen = new Set();
@@ -232,9 +249,11 @@ export const getGame = (id) =>
 export function findByEan(ean) {
   const clean = normalizeEan(ean);
   if (!clean) return [];
+  const formes = eanVariants(clean);
+  const trous = formes.map(() => '?').join(', ');
   return db
-    .prepare(`SELECT ${SELECT_COLUMNS} FROM games WHERE ean = ? ORDER BY id ASC`)
-    .all(clean);
+    .prepare(`SELECT ${SELECT_COLUMNS} FROM games WHERE ean IN (${trous}) ORDER BY id ASC`)
+    .all(...formes);
 }
 
 export function createGame(payload) {
