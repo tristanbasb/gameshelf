@@ -886,6 +886,146 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   background: var(--surface-2);
 }
 
+/* --------------------------------------------------------------------------
+   Fiche detaillee (consultation)
+   -------------------------------------------------------------------------- */
+
+.detail {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.detail-media {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: linear-gradient(to bottom right, #182136, #0f1424);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+[data-theme="light"] .detail-media {
+  background: linear-gradient(to bottom right, #eef1f8, #e3e8f4);
+}
+/* Comme sur les fiches de la grille : la jaquette entiere, jamais rognee. */
+.detail-media img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 10px;
+}
+.detail-media .watermark {
+  position: static;
+  font-size: 76px;
+  color: rgba(71, 85, 105, 0.35);
+}
+
+.detail-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.detail-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-strong);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.detail-sub { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
+
+.detail-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.detail-tags .tag { font-size: 11px; padding: 3px 10px; }
+
+/* Tableau de caracteristiques : libelle a gauche, valeur a droite. */
+.detail-rows {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: 0 16px;
+  font-size: 13px;
+  border-top: 1px solid var(--border-soft);
+}
+.detail-rows dt {
+  padding: 7px 0;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-soft);
+}
+.detail-rows dd {
+  margin: 0;
+  padding: 7px 0;
+  color: var(--text);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-soft);
+  overflow-wrap: anywhere;
+}
+.detail-rows dd.absent { color: var(--text-faint); font-weight: 400; }
+.detail-rows dd.mono { font-family: var(--mono); font-size: 12.5px; }
+
+.detail-block h4 {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 9px;
+}
+
+/* Contenu de la boite : present coche, manquant barre et colore. */
+.parts-check { display: flex; flex-wrap: wrap; gap: 8px; }
+.part {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.part.present { color: var(--success); border-color: rgba(52, 211, 153, 0.3); }
+.part.absent {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.detail-taglist { display: flex; flex-wrap: wrap; gap: 6px; }
+.detail-taglist .tag-plain {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.detail-notes {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 11px 13px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.detail-dates { margin: 0; font-size: 11.5px; color: var(--text-faint); }
+
+@media (max-width: 620px) {
+  .detail { grid-template-columns: 1fr; gap: 16px; }
+  .detail-media { max-width: 190px; margin: 0 auto; }
+  .detail-rows { grid-template-columns: 1fr; gap: 0; }
+  .detail-rows dt { padding-bottom: 0; border-bottom: 0; }
+  .detail-rows dd { padding-top: 2px; }
+}
+
 .cover-picker { display: flex; gap: 14px; align-items: flex-start; }
 .cover-preview {
   width: 92px; height: 124px; flex: none;

@@ -219,7 +219,62 @@
   </div>
 </template>
 
-<!-- ======================= Modale : fiche de jeu ======================= -->
+<!-- ======================= Modale : fiche détaillée ======================= -->
+<template id="tpl-detail-modal">
+  <div class="modal-backdrop" data-close-on-backdrop>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+      <div class="modal-head">
+        <h2>Fiche du jeu</h2>
+        <button class="btn btn-ghost btn-icon" data-close aria-label="Fermer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail">
+          <div class="detail-media" id="detail-media"></div>
+
+          <div class="detail-main">
+            <div>
+              <h3 class="detail-name" id="detail-name"></h3>
+              <p class="detail-sub" id="detail-sub"></p>
+            </div>
+
+            <div class="detail-tags" id="detail-tags"></div>
+
+            <dl class="detail-rows" id="detail-rows"></dl>
+
+            <div class="detail-block" id="detail-parts-block">
+              <h4>Contenu de l'exemplaire</h4>
+              <div class="parts-check" id="detail-parts"></div>
+            </div>
+
+            <div class="detail-block" id="detail-taglist-block">
+              <h4>Tags</h4>
+              <div class="detail-taglist" id="detail-taglist"></div>
+            </div>
+
+            <div class="detail-block" id="detail-notes-block">
+              <h4>Notes</h4>
+              <p class="detail-notes" id="detail-notes"></p>
+            </div>
+
+            <p class="detail-dates" id="detail-dates"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-danger left" id="detail-delete">Supprimer</button>
+        <button type="button" class="btn" id="detail-fav"></button>
+        <button type="button" class="btn" data-close>Fermer</button>
+        <button type="button" class="btn btn-primary" id="detail-edit">Modifier</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- ======================= Modale : formulaire d'un jeu ======================= -->
 <template id="tpl-game-modal">
   <div class="modal-backdrop" data-close-on-backdrop>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="game-modal-title">

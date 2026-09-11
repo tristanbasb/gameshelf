@@ -243,7 +243,7 @@ function gameCard(game) {
   card.dataset.id = game.id;
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
-  card.setAttribute('aria-label', `Modifier ${game.title}`);
+  card.setAttribute('aria-label', `Voir la fiche de ${game.title}`);
 
   const favLabel = game.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris';
   const condition = game.condition
@@ -697,7 +697,137 @@ async function showLookup(code, modal, result, status) {
 }
 
 /* ==========================================================================
-   Modale : fiche de jeu
+   Modale : fiche detaillee
+   ========================================================================== */
+
+/** Une ligne du tableau de caracteristiques ; vide, elle affiche un tiret. */
+function detailRow(label, value, { mono = false } = {}) {
+  const absent = value === '' || value === null || value === undefined;
+  return `<dt>${esc(label)}</dt>
+    <dd class="${absent ? 'absent' : ''}${mono && !absent ? ' mono' : ''}">${absent ? '—' : esc(value)}</dd>`;
+}
+
+const CHECK_ICON =
+  '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const CROSS_ICON =
+  '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
+/**
+ * Fiche de consultation : tout ce qu'on sait du jeu, d'un coup d'oeil.
+ * L'edition reste accessible depuis le pied de la fiche, mais n'est plus
+ * imposee a chaque clic — on consulte bien plus souvent qu'on ne corrige.
+ */
+function openDetailModal(game) {
+  const modal = openModal('tpl-detail-modal');
+
+  // --- Visuel -------------------------------------------------------------
+  modal.$('#detail-media').innerHTML = game.cover_url
+    ? `<img src="${esc(game.cover_url)}" alt="Jaquette de ${esc(game.title)}">`
+    : `<span class="watermark">${esc(initial(game.title))}</span>`;
+
+  // --- Identite -----------------------------------------------------------
+  modal.$('#detail-name').textContent = game.title;
+  modal.$('#detail-sub').textContent =
+    [game.platform, game.region].filter(Boolean).join(' · ') || 'Plateforme non renseignée';
+
+  // --- Pastilles de synthese ----------------------------------------------
+  const missing = missingParts(game);
+  const tags = [];
+  tags.push(
+    missing.length
+      ? `<span class="tag tag-missing">sans ${esc(missing.join(', '))}</span>`
+      : `<span class="tag tag-ok">${CHECK_ICON} Complet</span>`,
+  );
+  if (game.condition) {
+    tags.push(`<span class="tag tag-cond" style="--cond:${CONDITION_COLORS[game.condition]}">
+      <span class="dot" style="background:${CONDITION_COLORS[game.condition]}"></span>
+      ${esc(CONDITION_LABELS[game.condition])}</span>`);
+  }
+  if (game.quantity > 1) {
+    tags.push(`<span class="tag tag-qty">×${game.quantity} exemplaires</span>`);
+  }
+  if (game.has_iso) tags.push(`<span class="tag tag-ok">${CHECK_ICON} ISO</span>`);
+  modal.$('#detail-tags').innerHTML = tags.join('');
+
+  // --- Caracteristiques ---------------------------------------------------
+  modal.$('#detail-rows').innerHTML = [
+    detailRow('Plateforme', game.platform),
+    detailRow('Région', game.region),
+    detailRow('Serial', game.serial, { mono: true }),
+    detailRow('Code-barres', game.ean, { mono: true }),
+    detailRow('Quantité', `${game.quantity} exemplaire${game.quantity > 1 ? 's' : ''}`),
+    detailRow('État', game.condition ? CONDITION_LABELS[game.condition] : ''),
+    detailRow('Sauvegarde ISO', game.has_iso ? 'Oui' : 'Non'),
+  ].join('');
+
+  // --- Contenu de l'exemplaire --------------------------------------------
+  modal.$('#detail-parts').innerHTML = PARTS.map((part) => {
+    const present = Boolean(game[part.key]);
+    return `<span class="part ${present ? 'present' : 'absent'}">
+      ${present ? CHECK_ICON : CROSS_ICON}${esc(part.label)}</span>`;
+  }).join('');
+
+  // --- Tags et notes, masques quand ils sont vides -------------------------
+  const tagList = game.tags ? game.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
+  modal.$('#detail-taglist-block').hidden = tagList.length === 0;
+  modal.$('#detail-taglist').innerHTML = tagList
+    .map((tag) => `<span class="tag-plain">${esc(tag)}</span>`)
+    .join('');
+
+  modal.$('#detail-notes-block').hidden = !game.notes;
+  modal.$('#detail-notes').textContent = game.notes || '';
+
+  const added = fmtDate(game.created_at);
+  const updated = fmtDate(game.updated_at);
+  modal.$('#detail-dates').textContent =
+    updated && updated !== added
+      ? `Ajouté le ${added} · modifié le ${updated}`
+      : `Ajouté le ${added}`;
+
+  // --- Actions ------------------------------------------------------------
+  const favButton = modal.$('#detail-fav');
+  const paintFav = (on) => {
+    favButton.textContent = on ? '★ Retirer des favoris' : '☆ Ajouter aux favoris';
+  };
+  paintFav(Boolean(game.favorite));
+  favButton.addEventListener('click', async () => {
+    const before = Boolean(game.favorite);
+    paintFav(!before);
+    try {
+      const updatedGame = await api.toggleFavorite(game.id);
+      game.favorite = updatedGame.favorite;
+      paintFav(Boolean(game.favorite));
+      refresh({ withMeta: true });
+    } catch (err) {
+      paintFav(before);
+      toast(err.message, 'error');
+    }
+  });
+
+  modal.$('#detail-edit').addEventListener('click', () => {
+    modal.close();
+    openGameModal(game);
+  });
+
+  modal.$('#detail-delete').addEventListener('click', async () => {
+    const ok = await confirmDialog(
+      `Supprimer « ${game.title} » de la collection ? Cette action est définitive.`,
+      { confirmLabel: 'Supprimer', title: 'Supprimer le jeu' },
+    );
+    if (!ok) return;
+    try {
+      await api.deleteGame(game.id);
+      modal.close();
+      toast('Jeu supprimé');
+      refresh({ withMeta: true });
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+/* ==========================================================================
+   Modale : formulaire d'un jeu
    ========================================================================== */
 
 const FORM_FIELDS = [
@@ -1227,7 +1357,7 @@ function bindEvents() {
 
 async function openGame(id) {
   try {
-    openGameModal(await api.get(`/api/games/${id}`));
+    openDetailModal(await api.get(`/api/games/${id}`));
   } catch (err) {
     toast(err.message, 'error');
   }
