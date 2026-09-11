@@ -526,16 +526,28 @@ async function refresh({ withMeta = false } = {}) {
  */
 const RETICULE = { left: 0.06, top: 0.28, width: 0.88, height: 0.44 };
 
-/** Largeur maximale analysee : au-dela, le cout grimpe sans gain de lecture. */
-const LARGEUR_ANALYSE_MAX = 1600;
+/*
+ * Largeur maximale analysee. Mesure faite sur vingt-cinq images de synthese
+ * (code occupant 15 a 60 % du champ, flou de 0 a 10 pixels) : de 1024 a
+ * 1690 pixels, le taux de lecture ne bouge pas — dix images lues sur
+ * vingt-cinq — mais le cout par image, lui, suit la surface. En dessous de
+ * 1024 on commence a perdre les petits codes nets. C'est donc le point ou
+ * l'on analyse le plus d'images par seconde sans rien lire de moins.
+ */
+const LARGEUR_ANALYSE_MAX = 1024;
 
 /**
- * Decoupe la zone du viseur dans l'image de la camera, a la resolution du
+ * Saisit la zone du viseur dans l'image de la camera, a la resolution du
  * capteur. L'apercu etant affiche en `cover`, une partie de l'image deborde
  * du cadre : il faut retrouver la portion reellement visible avant d'y
  * appliquer les fractions du viseur.
+ *
+ * Le decoupage est confie au navigateur, qui le fait sans sortir les pixels
+ * de la carte graphique : 0,1 ms ici, contre une vingtaine de millisecondes
+ * pour la meme operation faite a la main sur un canvas. L'image obtenue se
+ * transmet ensuite au decodeur sans etre recopiee.
  */
-function cropScanArea(video, frame, canvas) {
+async function saisirZoneViseur(video, frame) {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return null;
@@ -545,20 +557,21 @@ function cropScanArea(video, frame, canvas) {
   const echelle = Math.max(bw / vw, bh / vh);
   const visibleW = bw / echelle;
   const visibleH = bh / echelle;
-  const originX = (vw - visibleW) / 2;
-  const originY = (vh - visibleH) / 2;
 
-  const sx = originX + visibleW * RETICULE.left;
-  const sy = originY + visibleH * RETICULE.top;
+  const sx = (vw - visibleW) / 2 + visibleW * RETICULE.left;
+  const sy = (vh - visibleH) / 2 + visibleH * RETICULE.top;
   const sw = visibleW * RETICULE.width;
   const sh = visibleH * RETICULE.height;
+  if (sw < 1 || sh < 1) return null;
 
+  // La reduction n'est pas appliquee ici : le decodeur la fait lui-meme, de
+  // son cote, sans occuper le fil principal.
   const reduction = Math.min(1, LARGEUR_ANALYSE_MAX / sw);
-  canvas.width = Math.max(1, Math.round(sw * reduction));
-  canvas.height = Math.max(1, Math.round(sh * reduction));
-  canvas.getContext('2d', { willReadFrequently: true })
-    .drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  return canvas;
+  return {
+    image: await createImageBitmap(video, sx, sy, sw, sh),
+    largeur: Math.max(1, Math.round(sw * reduction)),
+    hauteur: Math.max(1, Math.round(sh * reduction)),
+  };
 }
 
 /**
@@ -566,38 +579,45 @@ function cropScanArea(video, frame, canvas) {
  * continue, mise au point sur un point precis, eclairage. Tous sont
  * optionnels et silencieusement ignores quand la camera ne les propose pas.
  */
-async function setupCameraControls(track, modal, status) {
+function setupCameraControls(track, modal, status) {
   const caps = track.getCapabilities?.() ?? {};
+
+  /*
+   * Les reglages sont poses sans etre attendus. `applyConstraints` demande
+   * plusieurs centaines de millisecondes a certains appareils — le temps
+   * d'arreter puis de relancer le capteur — et rien dans la lecture n'en
+   * depend : la faire patienter ne ferait que retarder le premier essai.
+   */
+  const regler = (reglage) => {
+    track.applyConstraints({ advanced: [reglage] }).catch(() => {
+      /* refuse par l'appareil : on garde ce qu'il propose par defaut */
+    });
+  };
 
   // Sans autofocus continu, le telephone fait souvent le point sur
   // l'arriere-plan et le code reste flou tant qu'on ne bouge pas.
-  if (caps.focusMode?.includes('continuous')) {
-    try {
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-    } catch { /* refuse : on garde le reglage par defaut */ }
-  }
+  if (caps.focusMode?.includes('continuous')) regler({ focusMode: 'continuous' });
 
   // Toucher l'apercu refait le point a cet endroit.
   const frame = modal.$('#scanner-frame');
   const peutViser = caps.pointsOfInterest || caps.focusMode?.includes('single-shot');
   if (peutViser) {
     frame.classList.add('focusable');
-    frame.addEventListener('click', async (event) => {
+    frame.addEventListener('click', (event) => {
+      // Regler le zoom ou l'eclairage n'est pas viser : ces commandes sont
+      // posees sur l'apercu, mais ne doivent pas declencher de mise au point.
+      if (event.target.closest('.torch-btn, .zoom-range')) return;
       const rect = frame.getBoundingClientRect();
-      const advanced = [];
       if (caps.pointsOfInterest) {
-        advanced.push({
+        regler({
           pointsOfInterest: [{
             x: (event.clientX - rect.left) / rect.width,
             y: (event.clientY - rect.top) / rect.height,
           }],
         });
       }
-      if (caps.focusMode?.includes('single-shot')) advanced.push({ focusMode: 'single-shot' });
-      try {
-        await track.applyConstraints({ advanced });
-        status.textContent = 'Mise au point…';
-      } catch { /* sans effet sur cet appareil */ }
+      if (caps.focusMode?.includes('single-shot')) regler({ focusMode: 'single-shot' });
+      status.textContent = 'Mise au point…';
     });
   }
 
@@ -618,7 +638,29 @@ async function setupCameraControls(track, modal, status) {
     });
   }
 
-  return { peutViser, torche: Boolean(caps.torch) };
+  // Pour etre lu, un code doit occuper assez de pixels ; s'en approcher bute
+  // vite sur la distance minimale de mise au point, en deca de laquelle le
+  // telephone ne sait plus faire le point du tout. Le zoom grossit le code
+  // sans avoir a approcher : on en applique d'emblee une dose raisonnable, le
+  // curseur permettant de revenir en arriere pour retrouver un champ large.
+  const zoom = caps.zoom;
+  if (zoom && zoom.max > zoom.min) {
+    const curseur = modal.$('#scan-zoom');
+    // Certains appareils comptent en pourcentage (100 a 400) plutot qu'en
+    // facteur : tout est exprime par rapport au minimum, ce qui marche dans
+    // les deux cas. Au-dela du double, l'image n'est souvent plus qu'un
+    // recadrage numerique, sans pixel supplementaire sur le code.
+    const confortable = Math.min(zoom.max, zoom.min * 2);
+    curseur.min = zoom.min;
+    curseur.max = Math.min(zoom.max, zoom.min * 4);
+    curseur.step = zoom.step || (zoom.min >= 100 ? 1 : 0.1);
+    curseur.value = confortable;
+    curseur.hidden = false;
+    regler({ zoom: confortable });
+    curseur.addEventListener('input', () => regler({ zoom: Number(curseur.value) }));
+  }
+
+  return { peutViser: Boolean(peutViser), torche: Boolean(caps.torch) };
 }
 
 /**
@@ -628,11 +670,16 @@ async function setupCameraControls(track, modal, status) {
 async function openScanModal({ onDetect } = {}) {
   let stopped = false;
   let stream = null;
+  let detecteur = null;
 
   const stopCamera = () => {
     stopped = true;
     if (stream) stream.getTracks().forEach((track) => track.stop());
     stream = null;
+    // Le decodeur tourne dans un worker : sans arret explicite, il survivrait
+    // a la fermeture de la modale et occuperait la memoire pour rien.
+    detecteur?.close();
+    detecteur = null;
   };
 
   const modal = openModal('tpl-scan-modal', { onClose: stopCamera });
@@ -684,7 +731,9 @@ async function openScanModal({ onDetect } = {}) {
     modal.$('#scan-manual').focus();
     return;
   }
-  if (!navigator.mediaDevices?.getUserMedia) {
+  // `createImageBitmap` sert a decouper le viseur sans bloquer l'affichage :
+  // sans lui, autant l'annoncer que de laisser un apercu qui ne lit rien.
+  if (!navigator.mediaDevices?.getUserMedia || typeof createImageBitmap !== 'function') {
     status.textContent =
       "Ce navigateur ne donne pas accès à la caméra. Saisissez le code à la main.";
     modal.$('#scanner-frame').hidden = true;
@@ -694,6 +743,17 @@ async function openScanModal({ onDetect } = {}) {
 
   try {
     status.textContent = 'Préparation du lecteur…';
+    /*
+     * Le decodeur se prepare pendant que la camera demarre. Les deux prennent
+     * chacun quelques centaines de millisecondes — autorisation, ouverture du
+     * capteur d'un cote, 350 Ko de decodeur de l'autre : les mener de front
+     * economise l'attente la plus courte des deux.
+     */
+    const lecteurPret = createBarcodeDetector().then(
+      (lecteur) => ({ lecteur }),
+      (erreur) => ({ erreur }),
+    );
+
     // La camera est demandee en premier : c'est elle qui declenche la
     // demande d'autorisation, et le geste de l'utilisateur est encore frais.
     // Une definition elevee laisse davantage de pixels sur le code une fois
@@ -714,7 +774,7 @@ async function openScanModal({ onDetect } = {}) {
     await video.play();
 
     const track = stream.getVideoTracks()[0];
-    const controles = await setupCameraControls(track, modal, status);
+    const controles = setupCameraControls(track, modal, status);
 
     // Le viseur affiche exactement la zone analysee.
     const frame = modal.$('#scanner-frame');
@@ -725,25 +785,50 @@ async function openScanModal({ onDetect } = {}) {
     reticule.style.bottom = `${(1 - RETICULE.top - RETICULE.height) * 100}%`;
 
     // Safari n'a pas d'API de lecture : createBarcodeDetector retombe alors
-    // sur le decodeur embarque, telecharge a cet instant seulement.
-    const detector = await createBarcodeDetector();
-    if (stopped) return;
+    // sur le decodeur embarque, mis en route pendant le demarrage camera.
+    const { lecteur, erreur } = await lecteurPret;
+    if (erreur) throw erreur;
+    if (stopped) {
+      lecteur.close();
+      return;
+    }
+    detecteur = lecteur;
+
+    let lastCode = '';
     status.textContent = controles.peutViser
       ? 'Cadrez le code dans le rectangle. Touchez l’image pour refaire le point.'
       : 'Cadrez le code-barres dans le rectangle.';
 
-    const canvas = document.createElement('canvas');
-    let lastCode = '';
-    const tick = async () => {
-      if (stopped) return;
+    // Passe un certain temps sans rien lire, ce n'est pas le cadrage qui est
+    // en cause mais presque toujours la taille du code ou la lumiere : on dit
+    // quoi corriger plutot que de laisser l'utilisateur insister.
+    const conseil = setTimeout(() => {
+      if (stopped || lastCode) return;
+      status.textContent = controles.torche
+        ? 'Rien pour l’instant : rapprochez-vous, ou allumez l’éclairage.'
+        : 'Rien pour l’instant : rapprochez-vous un peu du code.';
+    }, 6000);
+
+    let enCours = false;
+    const analyser = async () => {
+      if (stopped || enCours) return;
+      enCours = true;
       try {
-        const zone = cropScanArea(video, frame, canvas);
-        const codes = zone ? await detector.detect(zone) : [];
+        const zone = await saisirZoneViseur(video, frame);
+        if (!zone) return;
+        if (stopped) {
+          zone.image.close?.();
+          return;
+        }
+        const codes = await lecteur.detect(zone.image, zone.largeur, zone.hauteur);
         const code = codes[0]?.rawValue;
-        if (code && code !== lastCode) {
+        if (code && code !== lastCode && !stopped) {
           lastCode = code;
+          clearTimeout(conseil);
           navigator.vibrate?.(60);
-          status.textContent = `Code lu : ${code}`;
+          // Phrase volontairement inachevee : la recherche la termine, sans
+          // faire clignoter deux messages differents au meme endroit.
+          status.textContent = `Code ${code} : recherche…`;
           modal.$('#scan-manual').value = code;
           await handle(code);
           // On oublie le dernier code au bout de deux secondes : viser a
@@ -753,13 +838,28 @@ async function openScanModal({ onDetect } = {}) {
         }
       } catch {
         /* image illisible sur cette frame : on retente */
+      } finally {
+        enCours = false;
       }
-      // Analyser une zone reduite coute bien moins cher qu'une image entiere :
-      // on peut tenter plus souvent, ce qui multiplie les chances de tomber
-      // sur une image nette pendant que la main bouge.
-      if (!stopped) setTimeout(tick, 90);
     };
-    tick();
+
+    /*
+     * Une tentative par image affichee, jamais deux de front. Le decodage a
+     * lieu ailleurs, mais empiler des images que le decodeur n'aura pas le
+     * temps de traiter ne ferait qu'allonger le delai entre ce que montre
+     * l'apercu et ce qui est analyse. `requestVideoFrameCallback` ne rappelle
+     * qu'a l'arrivee d'une image reellement nouvelle ; a defaut, cadence fixe.
+     */
+    const aLaProchaineImage = typeof video.requestVideoFrameCallback === 'function'
+      ? (fn) => video.requestVideoFrameCallback(fn)
+      : (fn) => setTimeout(fn, 60);
+
+    const boucle = async () => {
+      if (stopped) return;
+      await analyser();
+      if (!stopped) aLaProchaineImage(boucle);
+    };
+    aLaProchaineImage(boucle);
   } catch (err) {
     modal.$('#scanner-frame').hidden = true;
     status.textContent =
@@ -790,11 +890,14 @@ async function showLookup(code, modal, result, status) {
         openGameModal(null, { ean: data.ean });
       });
       result.replaceChildren(add);
-      status.textContent = 'Aucune correspondance.';
+      // Le code lu reste affiche : sans lui, on ne sait plus si la reponse
+      // porte sur la boite que l'on vient de viser ou sur la precedente.
+      status.textContent = `Code ${code} : aucune correspondance.`;
       return;
     }
 
-    status.textContent = `${data.games.length} correspondance(s).`;
+    const n = data.games.length;
+    status.textContent = `Code ${code} : ${n} jeu${n > 1 ? 'x' : ''} trouvé${n > 1 ? 's' : ''}.`;
     result.replaceChildren(
       ...data.games.map((game) => {
         const missing = missingParts(game);

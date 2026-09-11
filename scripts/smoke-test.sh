@@ -192,6 +192,7 @@ check "GET /page-inexistante" "$(status "$BASE_URL/page-inexistante")" "404"
 
 # Decodeur embarque : sans lui, le scan serait impossible sur Safari.
 check "GET /js/barcode.js"            "$(status "$BASE_URL/js/barcode.js")"            "200"
+check "GET /js/scan-worker.js"        "$(status "$BASE_URL/js/scan-worker.js")"        "200"
 check "GET /js/vendor/zxing.min.js"   "$(status "$BASE_URL/js/vendor/zxing.min.js")"   "200"
 
 # Installation sur l'ecran d'accueil d'un telephone.

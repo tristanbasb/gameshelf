@@ -1109,6 +1109,32 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   border-radius: 10px;
   box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.35);
   pointer-events: none;
+  overflow: hidden;
+}
+
+/* Un trait qui balaie le viseur. Il ne suit pas la recherche — celle-ci fait
+   vingt tentatives par seconde, invisibles — mais il montre que l'appareil
+   travaille pendant qu'on cherche l'angle, ce qui evite de croire qu'il a
+   cesse de chercher. Anime par transformation seule : le compositeur s'en
+   charge, sans rien demander au fil principal qui decoupe les images. */
+.scanner-reticle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 44%,
+    rgba(167, 139, 250, 0.95) 50%,
+    transparent 56%
+  );
+  animation: scan-sweep 2.4s ease-in-out infinite;
+}
+@keyframes scan-sweep {
+  0%, 100% { transform: translateY(-44%); }
+  50% { transform: translateY(44%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scanner-reticle::after { animation: none; opacity: 0.5; }
 }
 
 /* Indique que toucher l'image refait la mise au point. */
@@ -1128,6 +1154,19 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   z-index: 2;
 }
 .torch-btn.on { background: var(--warning); color: #1a1205; border-color: transparent; }
+
+/* Zoom de la camera : grossir le code sans avoir a en approcher le telephone,
+   qui ne sait plus faire le point en dessous d'une dizaine de centimetres. */
+.zoom-range {
+  position: absolute;
+  left: 14px; right: 60px; bottom: 19px;
+  z-index: 2;
+  height: 20px;
+  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+}
 .scanner-status {
   margin: 10px 0 0;
   font-size: 12.5px;

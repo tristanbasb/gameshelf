@@ -107,6 +107,7 @@ const VERSIONED_ASSETS = [
   'js/api.js',
   'js/ui.js',
   'js/barcode.js',
+  'js/scan-worker.js',
   'js/vendor/zxing.min.js',
 ];
 
