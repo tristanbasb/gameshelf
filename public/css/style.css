@@ -1310,7 +1310,15 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   }
   .search-wrap { order: 10; flex: 1 0 100%; max-width: none; margin: 0; }
   .brand-label, .kbd { display: none; }
+
+  /*
+   * Le bouton flottant prend le relais du code-barres : garder celui de
+   * l'en-tete donnait deux boutons pour la meme action, dont un hors de
+   * portee du pouce. Les deux apparitions sont liees a la meme regle, pour
+   * qu'aucune largeur d'ecran ne puisse en montrer zero ou deux.
+   */
   .fab { display: grid; }
+  #btn-scan { display: none; }
 
   /* Le compteur et les selecteurs ne tiennent pas sur une seule ligne :
      ils s'empilent plutot que de s'ecraser mutuellement. */
