@@ -1119,6 +1119,31 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
 .scan-hit .h-title { font-weight: 700; font-size: 14px; }
 .scan-hit .h-meta { font-size: 12.5px; color: var(--text-muted); }
 
+/*
+ * Cible d'une confirmation destructrice. Elle occupe sa propre boite, avec un
+ * liseré rouge sur le flanc : le nom du jeu ne se lit plus au milieu d'une
+ * phrase, il est ce que la fenetre montre.
+ */
+.confirm-cible {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 14px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--danger-border);
+  border-left: 3px solid var(--danger);
+  background: var(--danger-soft);
+}
+.confirm-cible strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.confirm-cible .mono { font-size: 11.5px; color: var(--text-muted); }
+
 /* --------------------------------------------------------------------------
    Notifications
    -------------------------------------------------------------------------- */

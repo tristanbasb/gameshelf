@@ -495,9 +495,15 @@
       </div>
       <div class="modal-body">
         <p id="confirm-text" style="margin:0"></p>
+        <!-- Identite de ce qui va disparaitre, posee a part du texte : c'est
+             elle qu'il faut lire, pas la phrase qui l'entoure. -->
+        <div class="confirm-cible" id="confirm-cible" hidden>
+          <strong id="confirm-cible-nom"></strong>
+          <span class="mono" id="confirm-cible-ref"></span>
+        </div>
       </div>
       <div class="modal-foot">
-        <button type="button" class="btn" data-close>Annuler</button>
+        <button type="button" class="btn" data-close id="confirm-cancel">Annuler</button>
         <button type="button" class="btn btn-danger" id="confirm-ok">Confirmer</button>
       </div>
     </div>

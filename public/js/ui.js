@@ -231,8 +231,20 @@ export function openModal(templateId, { onClose } = {}) {
   return { root, close, $: (selector) => root.querySelector(selector) };
 }
 
-/** Boite de dialogue de confirmation, resolue par une promesse. */
-export function confirmDialog(message, { confirmLabel = 'Confirmer', title = 'Confirmation' } = {}) {
+/**
+ * Boite de dialogue de confirmation, resolue par une promesse.
+ *
+ * `cible` designe ce sur quoi porte l'action — `{ nom, reference }`. Elle est
+ * affichee a part, dans un encadre : sur une suppression, savoir *lequel* des
+ * jeux va disparaitre compte plus que la formulation de la question.
+ *
+ * `danger` donne le focus a « Annuler » plutot qu'au bouton d'action. Sans
+ * cela, une touche Entree restee sous le doigt suffisait a supprimer.
+ */
+export function confirmDialog(
+  message,
+  { confirmLabel = 'Confirmer', title = 'Confirmation', cible = null, danger = false } = {},
+) {
   return new Promise((resolve) => {
     let answered = false;
     const modal = openModal('tpl-confirm-modal', {
@@ -243,14 +255,24 @@ export function confirmDialog(message, { confirmLabel = 'Confirmer', title = 'Co
     modal.$('#confirm-title').textContent = title;
     modal.$('#confirm-text').textContent = message;
 
+    if (cible?.nom) {
+      modal.$('#confirm-cible').hidden = false;
+      modal.$('#confirm-cible-nom').textContent = cible.nom;
+      const reference = modal.$('#confirm-cible-ref');
+      reference.textContent = cible.reference || '';
+      reference.hidden = !cible.reference;
+    }
+
     const okButton = modal.$('#confirm-ok');
     okButton.textContent = confirmLabel;
-    okButton.focus();
     okButton.addEventListener('click', () => {
       answered = true;
       modal.close();
       resolve(true);
     });
+
+    // Sur une action destructrice, le focus va au refus.
+    (danger ? modal.$('#confirm-cancel') : okButton).focus();
   });
 }
 

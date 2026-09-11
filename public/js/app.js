@@ -769,6 +769,29 @@ async function showLookup(code, modal, result, status) {
    ========================================================================== */
 
 /**
+ * Demande confirmation avant de retirer un jeu.
+ *
+ * La reference reprend ce qui distingue deux exemplaires voisins — plateforme,
+ * region, numero de serie : dans une collection qui contient plusieurs
+ * editions d'un meme titre, c'est la seule chose qui permet de savoir lequel
+ * va disparaitre.
+ */
+function confirmerSuppression(game) {
+  return confirmDialog(
+    'Ce jeu sera retiré de la collection. Vous pourrez annuler pendant quelques secondes.',
+    {
+      title: 'Supprimer ce jeu ?',
+      confirmLabel: 'Supprimer',
+      danger: true,
+      cible: {
+        nom: game.title,
+        reference: [game.platform, game.region, game.serial].filter(Boolean).join(' · '),
+      },
+    },
+  );
+}
+
+/**
  * Une suppression est definitive et souvent regrettee dans la seconde qui
  * suit. On laisse donc une fenetre de rattrapage dans la notification.
  *
@@ -960,10 +983,7 @@ function openDetailModal(game) {
   });
 
   modal.$('#detail-delete').addEventListener('click', async () => {
-    const ok = await confirmDialog(
-      `Supprimer « ${game.title} » de la collection ? Cette action est définitive.`,
-      { confirmLabel: 'Supprimer', title: 'Supprimer le jeu' },
-    );
+    const ok = await confirmerSuppression(game);
     if (!ok) return;
     try {
       await api.deleteGame(game.id);
@@ -1011,15 +1031,12 @@ function openGameModal(game = null, prefill = {}) {
     const deleteButton = modal.$('#btn-delete');
     deleteButton.hidden = false;
     deleteButton.addEventListener('click', async () => {
-      const ok = await confirmDialog(
-        `Supprimer « ${game.title} » de la collection ? Cette action est définitive.`,
-        { confirmLabel: 'Supprimer', title: 'Supprimer le jeu' },
-      );
+      const ok = await confirmerSuppression(game);
       if (!ok) return;
       try {
         await api.deleteGame(game.id);
         modal.close();
-        toast('Jeu supprimé');
+        offerUndoDelete(game);
         refresh({ withMeta: true });
       } catch (err) {
         toast(err.message, 'error');
@@ -1263,8 +1280,17 @@ function openIoModal() {
     const mode = modal.$('#import-mode').value;
     if (mode === 'replace') {
       const ok = await confirmDialog(
-        'Le mode « remplacer » efface toute la collection actuelle avant l’import. Continuer ?',
-        { confirmLabel: 'Remplacer', title: 'Remplacer la collection' },
+        'Toute la collection actuelle sera effacée avant l’import. '
+        + 'Contrairement à la suppression d’un jeu, ceci ne peut pas être annulé.',
+        {
+          title: 'Remplacer toute la collection ?',
+          confirmLabel: 'Tout remplacer',
+          danger: true,
+          cible: {
+            nom: `${fmtNumber(state.meta?.totals?.total ?? 0)} jeux seront supprimés`,
+            reference: file.name,
+          },
+        },
       );
       if (!ok) return;
     }
