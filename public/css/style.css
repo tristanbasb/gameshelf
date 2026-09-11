@@ -924,13 +924,31 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
 
 .detail-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
+.detail-title-row { display: flex; align-items: flex-start; gap: 8px; }
+
 .detail-name {
   font-size: 20px;
   font-weight: 800;
   color: var(--text-strong);
   line-height: 1.25;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
+
+.copy-btn {
+  flex: none;
+  margin-top: 2px;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.copy-btn:hover { color: var(--text-strong); background: var(--surface-3); border-color: var(--border-strong); }
+.copy-btn.done { color: var(--success); border-color: rgba(52, 211, 153, 0.4); }
 .detail-sub { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
 
 .detail-tags { display: flex; flex-wrap: wrap; gap: 7px; }

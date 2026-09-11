@@ -93,6 +93,45 @@ export function fmtDate(value) {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('fr-FR');
 }
 
+/**
+ * Copie un texte dans le presse-papiers.
+ *
+ * L'API moderne exige un contexte securise : elle fonctionne en HTTPS et sur
+ * localhost, mais pas si l'application est servie en HTTP simple sur le
+ * reseau local. On retombe alors sur la vieille methode, moins elegante mais
+ * qui n'a pas cette contrainte.
+ */
+export async function copyText(text) {
+  const value = String(text ?? '');
+  if (!value) return false;
+
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      /* refus ou absence de permission : on tente le repli */
+    }
+  }
+
+  try {
+    const field = document.createElement('textarea');
+    field.value = value;
+    field.setAttribute('readonly', '');
+    // Hors champ de vision, sans provoquer de defilement ni de zoom.
+    field.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(field);
+    field.select();
+    // iOS ignore select() seul sur un champ en lecture seule.
+    field.setSelectionRange(0, value.length);
+    const ok = document.execCommand('copy');
+    field.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Notifications                                                              */
 /* -------------------------------------------------------------------------- */

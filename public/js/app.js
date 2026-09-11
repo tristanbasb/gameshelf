@@ -3,7 +3,7 @@ import { createBarcodeDetector } from './barcode.js';
 import {
   $, $$, esc, toast, openModal, confirmDialog, debounce, initial, store,
   CONDITION_LABELS, CONDITION_SHORT, CONDITION_COLORS,
-  PARTS, missingParts, fmtNumber, fmtDate,
+  PARTS, missingParts, fmtNumber, fmtDate, copyText,
 } from './ui.js';
 
 /* ==========================================================================
@@ -739,6 +739,9 @@ function detailRow(label, value, { mono = false } = {}) {
 
 const CHECK_ICON =
   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const CHECK_ICON_LARGE =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
 const CROSS_ICON =
   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
@@ -759,6 +762,24 @@ function openDetailModal(game) {
   modal.$('#detail-name').textContent = game.title;
   modal.$('#detail-sub').textContent =
     [game.platform, game.region].filter(Boolean).join(' · ') || 'Plateforme non renseignée';
+
+  // Copie du titre, pour le coller dans une recherche ou une annonce.
+  const copyButton = modal.$('#detail-copy');
+  const copyIcon = copyButton.innerHTML;
+  copyButton.addEventListener('click', async () => {
+    if (!(await copyText(game.title))) {
+      toast('Copie impossible sur ce navigateur', 'error');
+      return;
+    }
+    // La coche remplace l'icone un instant : plus lisible qu'une notification
+    // pour un geste aussi bref.
+    copyButton.classList.add('done');
+    copyButton.innerHTML = CHECK_ICON_LARGE;
+    setTimeout(() => {
+      copyButton.classList.remove('done');
+      copyButton.innerHTML = copyIcon;
+    }, 1400);
+  });
 
   // --- Pastilles de synthese ----------------------------------------------
   // Recalculees a la demande : cocher un element de contenu doit faire passer
