@@ -346,6 +346,18 @@ label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 
 .filter-list { display: flex; flex-direction: column; gap: 3px; }
 
+/* Nom de famille au-dessus d'un groupe de plateformes. Volontairement
+   discret : il ordonne la liste, il n'est pas cliquable. */
+.filter-famille {
+  padding: 9px 12px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.filter-famille:first-child { padding-top: 2px; }
+
 .filter-item {
   display: flex;
   align-items: center;

@@ -82,6 +82,70 @@ function filterButton({ label, count, active, dataset, color }) {
   return button;
 }
 
+/*
+ * Familles de plateformes, dans l'ordre d'affichage.
+ *
+ * La base ne connait pas de constructeur : elle ne stocke qu'un nom saisi a
+ * la main — « PlayStation 2 », « PS2 », « Mega Drive ». La famille est donc
+ * reconnue au nom, et ce qu'aucun motif ne reclame finit dans « Autres »
+ * plutot que de disparaitre.
+ *
+ * L'ordre des familles compte : « PC Engine » doit etre reconnu comme une
+ * console NEC avant que « PC » ne l'attrape, et « Atari ST » comme un Atari
+ * avant de finir parmi les ordinateurs.
+ */
+const FAMILLES = [
+  {
+    nom: 'PlayStation',
+    motifs: [/playstation/i, /\bps ?[1-5]\b/i, /\bpsx\b/i, /\bpsp\b/i, /\bvita\b/i],
+  },
+  { nom: 'Xbox', motifs: [/xbox/i] },
+  {
+    nom: 'Nintendo',
+    motifs: [
+      /nintendo/i, /\bs?nes\b/i, /famicom/i, /\bn ?64\b/i, /game ?cube/i, /\bngc\b/i,
+      /\bwii\b/i, /switch/i, /game ?boy/i, /\bgb[ac]?\b/i, /\bds ?i?\b/i, /\b3ds\b/i,
+      /virtual boy/i, /amiibo/i,
+    ],
+  },
+  {
+    nom: 'Sega',
+    motifs: [
+      /sega/i, /mega ?drive/i, /genesis/i, /master ?system/i, /dreamcast/i,
+      /saturn/i, /game ?gear/i, /\bmega ?cd\b/i, /32 ?x/i,
+    ],
+  },
+  { nom: 'NEC', motifs: [/pc ?engine/i, /pc ?-? ?fx/i, /turbografx/i, /turbo ?duo/i] },
+  { nom: 'Atari', motifs: [/atari/i, /\blynx\b/i, /\bjaguar\b/i, /\b2600\b/i, /\b7800\b/i] },
+  { nom: 'SNK', motifs: [/neo ?geo/i, /\bsnk\b/i] },
+  {
+    nom: 'Ordinateurs',
+    motifs: [/\bpc\b/i, /windows/i, /\bdos\b/i, /steam/i, /\bmac\b/i, /linux/i, /amiga/i, /amstrad/i, /commodore/i, /\bc ?64\b/i, /msx/i, /spectrum/i],
+  },
+];
+
+/**
+ * Range les plateformes par famille. Renvoie les familles non vides, dans
+ * l'ordre ci-dessus, chacune triee par nom — ce qui suffit a mettre les
+ * consoles numerotees dans l'ordre ou elles sont sorties.
+ */
+function rangerParFamille(plateformes) {
+  const paniers = new Map(FAMILLES.map((f) => [f.nom, []]));
+  paniers.set('Autres', []);
+
+  for (const item of plateformes) {
+    const famille = FAMILLES.find((f) => f.motifs.some((motif) => motif.test(item.value)));
+    paniers.get(famille ? famille.nom : 'Autres').push(item);
+  }
+
+  return [...paniers]
+    .filter(([, items]) => items.length > 0)
+    .map(([nom, items]) => [
+      nom,
+      items.sort((a, b) => a.value.localeCompare(b.value, 'fr', { numeric: true })),
+    ]);
+}
+
 function renderSidebar() {
   const meta = state.meta;
   if (!meta) return;
@@ -123,8 +187,43 @@ function renderSidebar() {
     );
   };
 
-  fillList('#filter-platform', meta.platforms, 'platform');
+  /*
+   * Les plateformes sont groupees par constructeur. Le titre de famille n'a
+   * d'interet que s'il y en a plusieurs : sur une collection d'une seule
+   * marque, il ajouterait une ligne pour ne rien distinguer.
+   */
+  function fillPlatforms(plateformes) {
+    const box = $('#filter-platform');
+    if (!plateformes.length) {
+      box.innerHTML =
+        '<p style="color:var(--text-faint);font-size:13px;padding:4px 10px">Aucune donnée</p>';
+      return;
+    }
+
+    const familles = rangerParFamille(plateformes);
+    const enfants = [];
+    for (const [nom, items] of familles) {
+      if (familles.length > 1) {
+        const titre = document.createElement('span');
+        titre.className = 'filter-famille';
+        titre.textContent = nom;
+        enfants.push(titre);
+      }
+      for (const item of items) {
+        enfants.push(filterButton({
+          label: item.value,
+          count: item.count,
+          active: state.filters.platform === item.value,
+          dataset: { filter: 'platform', value: item.value },
+        }));
+      }
+    }
+    box.replaceChildren(...enfants);
+  }
+
+  fillPlatforms(meta.platforms);
   fillList('#filter-region', meta.regions, 'region', 10);
+
   fillList('#filter-tags', meta.tags, 'tag', 12);
 
   // Listes de saisie assistee des formulaires.
