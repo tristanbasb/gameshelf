@@ -942,11 +942,87 @@ function offerUndoDelete(game) {
    Modale : fiche detaillee
    ========================================================================== */
 
-/** Une ligne du tableau de caracteristiques ; vide, elle affiche un tiret. */
-function detailRow(label, value, { mono = false } = {}) {
-  const absent = value === '' || value === null || value === undefined;
-  return `<dt>${esc(label)}</dt>
-    <dd class="${absent ? 'absent' : ''}${mono && !absent ? ' mono' : ''}">${absent ? '—' : esc(value)}</dd>`;
+/*
+ * Motifs EAN : chaque chiffre s'ecrit sur sept modules, selon trois jeux —
+ * L et G a gauche du milieu, R a droite. Le premier chiffre d'un EAN-13 ne
+ * se dessine pas : il se lit dans l'alternance L / G des six suivants.
+ */
+const EAN_L = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011'];
+const EAN_G = ['0100111', '0110011', '0011011', '0100001', '0011101', '0111001', '0000101', '0010001', '0001001', '0010111'];
+const EAN_R = ['1110010', '1100110', '1101100', '1000010', '1011100', '1001110', '1010000', '1000100', '1001000', '1110100'];
+const EAN_PARITE = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+
+/** Clef de controle d'un EAN : poids 3 et 1 en alternance, depuis la droite. */
+function cleEan(chiffres) {
+  let somme = 0;
+  for (let i = 0; i < chiffres.length; i += 1) {
+    somme += Number(chiffres[i]) * ((chiffres.length - i) % 2 === 1 ? 3 : 1);
+  }
+  return (10 - (somme % 10)) % 10;
+}
+
+/**
+ * Code-barres dessine a partir de l'EAN enregistre, tel qu'il est imprime au
+ * dos du boitier.
+ *
+ * Renvoie null quand le code ne se dessine pas honnetement — longueur que ne
+ * connait pas la norme, ou clef de controle fausse : mieux vaut n'afficher
+ * que les chiffres qu'un code-barres qui ne correspondrait a aucun boitier.
+ * Un code UPC-A a douze chiffres est un EAN-13 dont le premier est un zero.
+ */
+function codeBarresSvg(ean) {
+  let code = String(ean || '').replace(/\D/g, '');
+  if (code.length === 12) code = `0${code}`;
+  if (code.length !== 13 && code.length !== 8) return null;
+  if (cleEan(code.slice(0, -1)) !== Number(code.at(-1))) return null;
+
+  const long = code.length === 13;
+  let motif = '101';
+  if (long) {
+    const parite = EAN_PARITE[code[0]];
+    for (let i = 1; i <= 6; i += 1) motif += (parite[i - 1] === 'L' ? EAN_L : EAN_G)[code[i]];
+    motif += '01010';
+    for (let i = 7; i <= 12; i += 1) motif += EAN_R[code[i]];
+  } else {
+    for (let i = 0; i < 4; i += 1) motif += EAN_L[code[i]];
+    motif += '01010';
+    for (let i = 4; i < 8; i += 1) motif += EAN_R[code[i]];
+  }
+  motif += '101';
+
+  // Marges de silence : a gauche d'un EAN-13 s'imprime son premier chiffre.
+  const marge = long ? 11 : 7;
+  const largeur = marge + motif.length + 7;
+  const milieu = long ? 45 : 31;
+  const gardes = [[0, 2], [milieu, milieu + 4], [motif.length - 3, motif.length - 1]];
+
+  // Les barres voisines sont fusionnees : un rectangle par barre imprimee,
+  // pas un par module.
+  const barres = [];
+  for (let x = 0; x < motif.length; x += 1) {
+    if (motif[x] !== '1') continue;
+    let fin = x;
+    while (motif[fin + 1] === '1') fin += 1;
+    const garde = gardes.some(([a, b]) => x >= a && fin <= b);
+    // Barres ecourtees, comme sur la plupart des boitiers : le code reste
+    // lisible, et l'etiquette ne rehausse pas toute la bande du bas.
+    barres.push(`<rect x="${marge + x}" y="0" width="${fin - x + 1}" height="${garde ? 45 : 40}"/>`);
+    x = fin;
+  }
+
+  // Groupes de chiffres sous les barres, cales sur la moitie qu'ils decrivent.
+  const groupe = (texte, debutModule, modules) =>
+    `<text x="${marge + debutModule + modules / 2}" y="55" text-anchor="middle"
+      textLength="${modules - 4}" lengthAdjust="spacing">${texte}</text>`;
+  const chiffres = long
+    ? `<text x="${marge - 6}" y="55" text-anchor="middle">${code[0]}</text>`
+      + groupe(code.slice(1, 7), 3, 42) + groupe(code.slice(7), 50, 42)
+    : groupe(code.slice(0, 4), 3, 28) + groupe(code.slice(4), 36, 28);
+
+  return `<svg class="ean-barres" viewBox="0 0 ${largeur} 57" width="${largeur * 2}" height="114"
+      role="img" aria-label="Code-barres ${code}">
+    <g shape-rendering="crispEdges">${barres.join('')}</g>${chiffres}
+  </svg>`;
 }
 
 const CHECK_ICON =
@@ -956,11 +1032,18 @@ const CHECK_ICON_LARGE =
 
 const CROSS_ICON =
   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+const CROSS_ICON_LARGE =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
 /**
  * Fiche de consultation : tout ce qu'on sait du jeu, d'un coup d'oeil.
  * L'edition reste accessible depuis le pied de la fiche, mais n'est plus
  * imposee a chaque clic — on consulte bien plus souvent qu'on ne corrige.
+ *
+ * La fiche se lit comme un boitier que l'on retourne. A gauche l'objet : sa
+ * jaquette, et l'etiquette du dos avec le code-barres et la reference. A
+ * droite l'exemplaire que l'on possede : son etat, et surtout ce que contient
+ * la boite. Chaque information n'y figure qu'une fois.
  */
 function openDetailModal(game) {
   const modal = openModal('tpl-detail-modal');
@@ -994,38 +1077,40 @@ function openDetailModal(game) {
     }, 1400);
   });
 
-  // --- Pastilles de synthese ----------------------------------------------
-  // Recalculees a la demande : cocher un element de contenu doit faire passer
-  // la fiche de « sans notice » a « Complet » sans la rouvrir.
+  // --- Etat et completude --------------------------------------------------
+  // Recalcules a la demande : cocher un element de contenu doit faire passer
+  // la fiche de « 3 sur 4 » a « Complet » sans la rouvrir.
   function refreshDetailSummary() {
     const missing = missingParts(game);
-    const tags = [
-      missing.length
-        ? `<span class="tag tag-missing">sans ${esc(missing.join(', '))}</span>`
-        : `<span class="tag tag-ok">${CHECK_ICON} Complet</span>`,
-    ];
-    if (game.condition) {
-      tags.push(`<span class="tag tag-cond" style="--cond:${CONDITION_COLORS[game.condition]}">
-        <span class="dot" style="background:${CONDITION_COLORS[game.condition]}"></span>
-        ${esc(CONDITION_LABELS[game.condition])}</span>`);
-    }
-    if (game.quantity > 1) {
-      tags.push(`<span class="tag tag-qty">×${game.quantity} exemplaires</span>`);
-    }
-    if (game.has_iso) tags.push(`<span class="tag tag-ok">${CHECK_ICON} ISO</span>`);
-    modal.$('#detail-tags').innerHTML = tags.join('');
+    const compte = modal.$('#detail-compte');
+    compte.textContent = missing.length
+      ? `${PARTS.length - missing.length} sur ${PARTS.length}`
+      : 'Complet';
+    compte.classList.toggle('incomplet', missing.length > 0);
+
+    const couleur = CONDITION_COLORS[game.condition] || CONDITION_COLORS[''];
+    modal.$('#detail-tags').innerHTML = [
+      `<span class="etat-condition"><span class="dot" style="background:${couleur}"></span>${
+        esc(CONDITION_LABELS[game.condition] ?? CONDITION_LABELS[''])}</span>`,
+      `<span>${game.quantity} exemplaire${game.quantity > 1 ? 's' : ''}</span>`,
+      game.has_iso
+        ? `<span class="etat-iso">${CHECK_ICON} Avec ISO</span>`
+        : '<span>Sans ISO</span>',
+    ].join('');
   }
   refreshDetailSummary();
 
-  // --- Caracteristiques ---------------------------------------------------
-  modal.$('#detail-rows').innerHTML = [
-    detailRow('Plateforme', game.platform),
-    detailRow('Région', game.region),
-    detailRow('Serial', game.serial, { mono: true }),
-    detailRow('Code-barres', game.ean, { mono: true }),
-    detailRow('Quantité', `${game.quantity} exemplaire${game.quantity > 1 ? 's' : ''}`),
-    detailRow('État', game.condition ? CONDITION_LABELS[game.condition] : ''),
-    detailRow('Sauvegarde ISO', game.has_iso ? 'Oui' : 'Non'),
+  // --- Etiquette du dos : code-barres et reference ---------------------------
+  const etiquette = modal.$('#detail-etiquette');
+  const barres = codeBarresSvg(game.ean);
+  etiquette.hidden = !game.ean && !game.serial;
+  etiquette.innerHTML = [
+    barres || (game.ean
+      ? `<div class="etiquette-ligne"><span>EAN</span><strong>${esc(game.ean)}</strong></div>`
+      : ''),
+    game.serial
+      ? `<div class="etiquette-ligne"><span>Serial</span><strong>${esc(game.serial)}</strong></div>`
+      : '',
   ].join('');
 
   // --- Contenu de l'exemplaire --------------------------------------------
@@ -1036,8 +1121,10 @@ function openDetailModal(game) {
     partsBox.innerHTML = PARTS.map((part) => {
       const present = Boolean(game[part.key]);
       return `<button type="button" class="part ${present ? 'present' : 'absent'}"
-        data-part="${part.key}" title="${present ? 'Marquer comme manquant' : 'Marquer comme présent'}">
-        ${present ? CHECK_ICON : CROSS_ICON}${esc(part.label)}</button>`;
+        data-part="${part.key}" aria-pressed="${present}"
+        title="${present ? 'Marquer comme manquant' : 'Marquer comme présent'}">
+        <span class="part-icone">${present ? CHECK_ICON_LARGE : CROSS_ICON_LARGE}</span>
+        <span class="part-nom">${esc(part.label)}</span></button>`;
     }).join('');
   };
   renderParts();
@@ -1082,7 +1169,13 @@ function openDetailModal(game) {
   // --- Actions ------------------------------------------------------------
   const favButton = modal.$('#detail-fav');
   const paintFav = (on) => {
-    favButton.textContent = on ? '★ Retirer des favoris' : '☆ Ajouter aux favoris';
+    const libelle = on ? 'Retirer des favoris' : 'Ajouter aux favoris';
+    favButton.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="${on ? 'currentColor' : 'none'}"
+      stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="${STAR_PATH}"/></svg>`;
+    favButton.title = libelle;
+    favButton.setAttribute('aria-label', libelle);
+    favButton.setAttribute('aria-pressed', String(on));
+    favButton.classList.toggle('on', on);
   };
   paintFav(Boolean(game.favorite));
   favButton.addEventListener('click', async () => {

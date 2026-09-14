@@ -239,61 +239,75 @@
 <!-- ======================= Modale : fiche détaillée ======================= -->
 <template id="tpl-detail-modal">
   <div class="modal-backdrop" data-close-on-backdrop>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detail-name">
-      <div class="modal-head">
-        <h2>Fiche du jeu</h2>
-        <button class="btn btn-ghost btn-icon" data-close aria-label="Fermer">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
+    <div class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+      <!-- Le titre du jeu est le titre de la fenetre : pas d'en-tete generique
+           « Fiche du jeu » au-dessus de lui, seulement de quoi fermer. -->
+      <button class="btn btn-ghost btn-icon detail-fermer" data-close aria-label="Fermer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
 
       <div class="modal-body">
         <div class="detail">
-          <div class="detail-media" id="detail-media"></div>
+          <!-- L'objet : sa jaquette. -->
+          <div class="detail-objet">
+            <div class="detail-media" id="detail-media"></div>
+          </div>
 
-          <div class="detail-main">
-            <div>
-              <div class="detail-title-row">
-                <h3 class="detail-name" id="detail-name"></h3>
-                <button type="button" class="copy-btn" id="detail-copy"
-                        title="Copier le titre" aria-label="Copier le titre">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="12" height="12" rx="2"/>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                  </svg>
-                </button>
-              </div>
+          <!-- L'exemplaire que l'on possede : son etat, ce qu'il contient. -->
+          <div class="detail-exemplaire">
+            <div class="detail-tete">
               <p class="detail-sub" id="detail-sub"></p>
+              <div class="detail-title-row">
+                <h2 class="detail-name" id="detail-name"></h2>
+                <div class="detail-actions">
+                  <button type="button" class="detail-action" id="detail-fav"></button>
+                  <button type="button" class="detail-action" id="detail-copy"
+                          title="Copier le titre" aria-label="Copier le titre">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="9" y="9" width="12" height="12" rx="2"/>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="detail-etat" id="detail-tags"></div>
             </div>
 
-            <div class="detail-tags" id="detail-tags"></div>
-
-            <dl class="detail-rows" id="detail-rows"></dl>
-
-            <div class="detail-block" id="detail-parts-block">
-              <h4>Contenu de l'exemplaire</h4>
+            <div class="detail-block detail-contenu" id="detail-parts-block">
+              <div class="detail-block-tete">
+                <h4>Contenu de l'exemplaire</h4>
+                <span class="contenu-compte" id="detail-compte"></span>
+              </div>
               <div class="parts-check" id="detail-parts"></div>
+              <p class="contenu-aide">Cliquez sur un élément pour changer son état.</p>
             </div>
 
-            <div class="detail-block" id="detail-taglist-block">
-              <h4>Tags</h4>
-              <div class="detail-taglist" id="detail-taglist"></div>
-            </div>
+          </div>
 
-            <div class="detail-block" id="detail-notes-block">
-              <h4>Notes</h4>
-              <p class="detail-notes" id="detail-notes"></p>
-            </div>
+          <!-- Le dos du boitier, sur toute la largeur : ce qu'on y a note, et
+               l'etiquette collee en bas a droite, la ou elle se trouve sur un
+               vrai boitier. -->
+          <div class="detail-pied">
+            <div class="detail-notes-col">
+              <div class="detail-block detail-taglist-block" id="detail-taglist-block">
+                <h4>Tags</h4>
+                <div class="detail-taglist" id="detail-taglist"></div>
+              </div>
 
-            <p class="detail-dates" id="detail-dates"></p>
+              <div class="detail-block detail-notes-block" id="detail-notes-block">
+                <h4>Notes</h4>
+                <p class="detail-notes" id="detail-notes"></p>
+              </div>
+
+              <p class="detail-dates" id="detail-dates"></p>
+            </div>
+            <div class="detail-etiquette" id="detail-etiquette" hidden></div>
           </div>
         </div>
       </div>
 
-      <div class="modal-foot">
+      <div class="modal-foot detail-foot">
         <button type="button" class="btn btn-danger left" id="detail-delete">Supprimer</button>
-        <button type="button" class="btn" id="detail-fav"></button>
-        <button type="button" class="btn" data-close>Fermer</button>
         <button type="button" class="btn btn-primary" id="detail-edit">Modifier</button>
       </div>
     </div>

@@ -1151,12 +1151,36 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
    Fiche detaillee (consultation)
    -------------------------------------------------------------------------- */
 
+.detail-modal { position: relative; max-width: 820px; }
+.detail-fermer { position: absolute; top: 12px; right: 12px; z-index: 3; }
+
+/*
+ * La fiche se lit comme un boitier que l'on retourne. En haut, la face : la
+ * jaquette a cote de son titre, de son etat et de ce que contient la boite —
+ * deux colonnes de meme hauteur, sans vide sous l'une ou l'autre. En bas, sur
+ * toute la largeur, le dos : ce qu'on y a note a gauche, et l'etiquette collee
+ * en bas a droite. Sur telephone, tout se mele dans une seule grille — voir
+ * plus bas.
+ */
 .detail {
   display: grid;
-  grid-template-columns: 216px minmax(0, 1fr);
-  gap: 26px;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 26px 28px;
   align-items: start;
 }
+.detail-objet { display: flex; flex-direction: column; min-width: 0; }
+.detail-exemplaire { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+
+.detail-pied {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border-soft);
+}
+.detail-notes-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
 
 /* Le visuel de la fiche recoit le meme traitement de boitier que la tuile. */
 .detail-media {
@@ -1189,89 +1213,127 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
 /* Comme sur les tuiles : la jaquette entiere, jamais rognee. */
 .detail-media img { width: 100%; height: 100%; }
 .detail-media .cover-genere { padding: 11% 9% 9%; }
+/* La reference est portee par l'etiquette juste en dessous. */
+.detail-media .cover-serie { display: none; }
 
-.detail-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+/*
+ * Etiquette du dos. C'est la seule surface claire de la fiche, et c'est
+ * voulu : un autocollant blanc, code-barres noir, tel qu'on le retourne au
+ * dos du boitier pour lire la reference.
+ */
+.detail-etiquette {
+  flex: none;
+  width: 244px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 9px 10px;
+  border-radius: 4px;
+  background: #f1efe9;
+  color: #16161a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 20px -14px rgba(0, 0, 0, 0.9);
+}
+[data-theme="light"] .detail-etiquette {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--border), 0 10px 20px -16px rgba(20, 20, 30, 0.4);
+}
+.ean-barres { display: block; max-width: 100%; height: auto; }
+.ean-barres rect { fill: #16161a; }
+.ean-barres text {
+  fill: #16161a;
+  font-family: var(--font-etroite);
+  font-size: 11px;
+  font-weight: 600;
+}
+.etiquette-ligne {
+  align-self: stretch;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 3px 0;
+  border-top: 1px dashed rgba(22, 22, 26, 0.24);
+  font-family: var(--font-etroite);
+}
+.etiquette-ligne:first-child { padding-top: 0; border-top: 0; }
+.etiquette-ligne span {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(22, 22, 26, 0.55);
+}
+.etiquette-ligne strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
 
-.detail-title-row { display: flex; align-items: flex-start; gap: 10px; }
+/* --- Tete : plateforme, titre, etat --- */
+
+.detail-tete { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+
+/* Plateforme et region en tete, comme sur la face du boitier. La marge a
+   droite laisse la place au bouton de fermeture. */
+.detail-sub {
+  margin: 2px 0 0;
+  padding-right: 44px;
+  font-family: var(--font-etroite);
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.detail-title-row { display: flex; align-items: flex-start; gap: 14px; }
 
 .detail-name {
+  flex: 1;
   font-family: var(--font-etroite);
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 780;
   color: var(--text-strong);
-  line-height: 1.02;
+  line-height: 1;
   letter-spacing: -0.005em;
   overflow-wrap: anywhere;
   min-width: 0;
 }
 
-.copy-btn {
-  flex: none;
-  margin-top: 3px;
-  width: 30px; height: 30px;
+.detail-actions { display: flex; gap: 6px; flex: none; margin-top: 2px; }
+.detail-action {
+  width: 34px; height: 34px;
   display: grid; place-items: center;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
-.copy-btn:hover { color: var(--text-strong); background: var(--surface); border-color: var(--border-strong); }
-.copy-btn.done { color: var(--success); border-color: rgba(87, 194, 139, 0.45); }
-.detail-sub { margin: 6px 0 0; font-size: 14px; color: var(--text-muted); }
+.detail-action:hover { color: var(--text-strong); background: var(--surface); border-color: var(--border-strong); }
+.detail-action.on { color: var(--text-strong); background: var(--surface); border-color: var(--border-strong); }
+.detail-action.done { color: var(--success); border-color: rgba(87, 194, 139, 0.45); }
 
-/* Sur la fiche, les pastilles ne sont plus posees sur une image : elles
-   prennent la matiere des surfaces de l'interface. */
-.detail-tags { display: flex; flex-wrap: wrap; gap: 7px; }
-.detail-tags .tag {
-  font-size: 12.5px;
-  padding: 4px 10px 3px;
-  background: var(--surface);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  color: var(--text-strong);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-.detail-tags .tag-ok { color: var(--success); }
-.detail-tags .tag-missing {
-  color: var(--missing);
-  background: var(--missing-soft);
-  box-shadow: inset 0 0 0 1px var(--missing-border);
-}
-.detail-tags .tag-cond { color: var(--cond); }
-
-/* Tableau de caracteristiques : libelle a gauche, valeur a droite. */
-.detail-rows {
-  margin: 0;
-  display: grid;
-  grid-template-columns: minmax(110px, auto) minmax(0, 1fr);
-  gap: 0 18px;
+/* L'etat de l'exemplaire en une ligne : etat, quantite, sauvegarde. */
+.detail-etat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
   font-size: 14px;
-  border-top: 1px solid var(--border-soft);
-}
-.detail-rows dt {
-  padding: 9px 0;
   color: var(--text-muted);
-  border-bottom: 1px solid var(--border-soft);
 }
-.detail-rows dd {
-  margin: 0;
-  padding: 9px 0;
-  color: var(--text-strong);
-  font-weight: 500;
-  border-bottom: 1px solid var(--border-soft);
-  overflow-wrap: anywhere;
-}
-.detail-rows dd.absent { color: var(--text-faint); font-weight: 400; }
-/* References et codes-barres : imprimes comme sur l'etiquette du boitier. */
-.detail-rows dd.mono {
-  font-family: var(--font-etroite);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  font-variant-numeric: tabular-nums;
-}
+.detail-etat > span { display: inline-flex; align-items: center; gap: 7px; }
+.detail-etat .etat-condition { color: var(--text-strong); font-weight: 600; }
+.detail-etat .dot { width: 8px; height: 8px; }
+.detail-etat .etat-iso { color: var(--success); gap: 5px; }
+
+/* --- Contenu : le coeur de la fiche --- */
 
 .detail-block h4 {
   font-family: var(--font-etroite);
@@ -1282,36 +1344,69 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   color: var(--text-faint);
   margin-bottom: 10px;
 }
+.detail-block-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.detail-block-tete h4 { margin-bottom: 0; }
 
-/* Contenu de la boite : present en vert, manquant barre en ambre — la meme
-   couleur que la pastille « 3/4 » des tuiles, pour la meme information. */
-.parts-check { display: flex; flex-wrap: wrap; gap: 8px; }
+.contenu-compte {
+  font-family: var(--font-etroite);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--success);
+}
+.contenu-compte.incomplet { color: var(--missing); }
+
+/*
+ * Les quatre elements de l'exemplaire, en tuiles egales : boite, jaquette,
+ * notice, disque. Present, une coche verte sur fond neutre ; manquant, une
+ * croix ambre et le nom barre — la meme couleur que la pastille « 3/4 » des
+ * tuiles, pour la meme information. Un clic inverse l'etat.
+ */
+.parts-check { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .part {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
+  justify-content: center;
+  gap: 8px;
+  min-height: 82px;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
+  background: var(--field);
+  color: var(--text-strong);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
 }
-.part:hover { background: var(--surface); }
+.part:hover { border-color: var(--border-strong); background: var(--surface); }
 .part:active { transform: scale(0.97); }
-.part.present { color: var(--success); border-color: rgba(87, 194, 139, 0.36); }
-.part.absent {
-  color: var(--missing);
-  border-color: var(--missing-border);
-  background: var(--missing-soft);
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
+.part-icone {
+  width: 28px; height: 28px;
+  flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
 }
-[data-theme="light"] .part.present { border-color: rgba(35, 135, 90, 0.35); }
+.part.present .part-icone { background: rgba(87, 194, 139, 0.16); color: var(--success); }
+.part.absent { border-color: var(--missing-border); background: var(--missing-soft); color: var(--missing); }
+.part.absent:hover { border-color: var(--missing); }
+.part.absent .part-icone { background: rgba(227, 163, 63, 0.2); color: var(--missing); }
+.part.absent .part-nom { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.contenu-aide { margin: 9px 0 0; font-size: 12.5px; color: var(--text-faint); }
+
+/* --- Tags, notes, dates --- */
 
 .detail-taglist { display: flex; flex-wrap: wrap; gap: 6px; }
 .detail-taglist .tag-plain {
@@ -1338,13 +1433,44 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
 
 .detail-dates { margin: 0; font-size: 12.5px; color: var(--text-faint); }
 
+/* Deux actions seulement dans le pied : on les garde cote a cote, meme sur
+   un ecran etroit, plutot que de les empiler. */
+.detail-foot { justify-content: space-between; }
+
+/*
+ * Sur telephone, une seule grille : la jaquette en vignette a cote du titre,
+ * puis le contenu, l'etiquette, les tags et les notes pleine largeur. Les
+ * deux colonnes s'effacent (display: contents) pour laisser leurs enfants
+ * se placer directement dans la grille.
+ */
 @media (max-width: 620px) {
-  .detail { grid-template-columns: 1fr; gap: 18px; }
-  .detail-media { width: 100%; max-width: 200px; margin: 0 auto; }
-  .detail-name { font-size: 28px; }
-  .detail-rows { grid-template-columns: 1fr; gap: 0; }
-  .detail-rows dt { padding-bottom: 0; border-bottom: 0; }
-  .detail-rows dd { padding-top: 2px; }
+  .detail { grid-template-columns: 108px minmax(0, 1fr); gap: 20px 14px; }
+  .detail-objet, .detail-exemplaire { display: contents; }
+  .detail-media { grid-column: 1; grid-row: 1; align-self: start; }
+  .detail-tete { grid-column: 2; grid-row: 1; align-self: center; }
+  .detail-contenu { grid-column: 1 / -1; grid-row: 2; }
+  .detail-pied { grid-row: 3; flex-direction: column; align-items: stretch; gap: 18px; padding-top: 20px; }
+  .detail-notes-col { display: contents; }
+  .detail-taglist-block { order: 1; }
+  .detail-notes-block { order: 2; }
+  .detail-etiquette { order: 3; align-self: center; width: 100%; max-width: 290px; }
+  .detail-dates { order: 4; text-align: center; }
+
+  .detail-sub { font-size: 11px; padding-right: 34px; }
+  .detail-title-row { flex-direction: column; gap: 10px; }
+  .detail-name { font-size: 25px; }
+  .detail-etat { font-size: 13px; gap: 4px 14px; }
+
+  .parts-check { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .part {
+    flex-direction: row;
+    justify-content: flex-start;
+    min-height: 0;
+    padding: 10px 11px;
+    text-align: left;
+    gap: 10px;
+  }
+  .part-icone { width: 26px; height: 26px; }
 }
 
 .cover-picker { display: flex; gap: 14px; align-items: flex-start; }
@@ -1595,6 +1721,8 @@ table.games td.title-cell { white-space: normal; font-weight: 600; min-width: 22
   .modal-foot { flex-direction: column-reverse; }
   .modal-foot .btn { width: 100%; justify-content: center; }
   .modal-foot .left { margin-right: 0; }
+  .modal-foot.detail-foot { flex-direction: row; }
+  .modal-foot.detail-foot .btn { width: auto; flex: 1 1 0; }
 }
 
 /* Sur telephone, la recherche passe sur sa propre ligne : elle devenait
