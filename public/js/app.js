@@ -327,19 +327,37 @@ function teinteDuTitre(titre) {
   return somme;
 }
 
+/** Nombre de couples fond / encre definis dans la feuille de style. */
+const TONS_JAQUETTE = 10;
+
 /**
- * Jaquette fabriquee a partir du seul titre, pour les exemplaires sans visuel.
+ * Jaquette fabriquee pour un exemplaire sans visuel.
  *
  * La vitrine repose entierement sur l'image ; laisser un cadre vide reviendrait
- * a la vider de son propos. Trois mots au plus, composes grand sur un degrade :
- * cela se lit comme une pochette, et non comme une case en attente.
+ * a la vider de son propos. La face est composee comme celle d'un boitier :
+ * plateforme et region en tete, titre en grand, reference au pied. Tout ce
+ * qu'elle affiche est vrai.
+ *
+ * Le ton et la position du disque en filigrane sont tires du titre : le meme
+ * jeu garde toujours la meme pochette, d'une session et d'un appareil a
+ * l'autre. Les couleurs elles-memes vivent dans la feuille de style.
  */
-function coverGeneree(titre) {
-  const texte = String(titre || '?').trim() || '?';
-  // Le titre est compose entier et coupe a trois lignes par le style : le
-  // decouper ici en mots donnait des morceaux absurdes — « The Fast and ».
-  return `<div class="cover-genere" style="--teinte:${teinteDuTitre(texte)}"
-    ><span>${esc(texte)}</span></div>`;
+function coverGeneree(game) {
+  const titre = String(game?.title || '?').trim() || '?';
+  const empreinte = teinteDuTitre(titre);
+  const tete = [game?.platform, game?.region].filter(Boolean).join(' · ');
+  // Deux derives distincts de l'empreinte, pour que le ton et la place du
+  // disque ne varient pas de concert d'une pochette a l'autre.
+  const disqueX = 28 + ((empreinte * 7) % 26);
+  const disqueY = 34 + ((empreinte * 13) % 22);
+  // Le titre est compose entier et coupe par le style : le decouper ici en
+  // mots donnait des morceaux absurdes — « The Fast and ».
+  return `<div class="cover-genere" data-ton="${empreinte % TONS_JAQUETTE}"
+      style="--disque-x:${disqueX}%;--disque-y:${disqueY}%">
+    ${tete ? `<span class="cover-tete">${esc(tete)}</span>` : ''}
+    <span class="cover-titre">${esc(titre)}</span>
+    ${game?.serial ? `<span class="cover-serie">${esc(game.serial)}</span>` : ''}
+  </div>`;
 }
 
 /**
@@ -354,9 +372,10 @@ function mediaMarkup(game) {
     // l'autre entiere par-dessus. Le navigateur ne la telecharge qu'une fois.
     return `<img class="cover-fond" src="${esc(game.cover_url)}" alt="" aria-hidden="true" loading="lazy">
       <img class="cover-main" src="${esc(game.cover_url)}" alt="" loading="lazy"
-        data-titre="${esc(game.title)}">`;
+        data-titre="${esc(game.title)}" data-plateforme="${esc(game.platform)}"
+        data-region="${esc(game.region)}" data-serie="${esc(game.serial)}">`;
   }
-  return coverGeneree(game.title);
+  return coverGeneree(game);
 }
 
 /** Les quatre elements d'un exemplaire, reveles au survol de la tuile. */
@@ -411,7 +430,7 @@ function gameCard(game) {
       <p class="card-sub">
         <span class="dot" style="background:${couleur}"></span>
         <span>${esc(CONDITION_SHORT[game.condition] ?? '—')}</span>
-        ${game.platform ? `<span>·</span><span>${esc(game.platform)}</span>` : ''}
+        ${game.platform ? `<span class="meta-plateforme">· ${esc(game.platform)}</span>` : ''}
       </p>
       <div class="card-parts">${partChips(game)}</div>
     </div>`;
@@ -948,8 +967,9 @@ function openDetailModal(game) {
 
   // --- Visuel -------------------------------------------------------------
   modal.$('#detail-media').innerHTML = game.cover_url
-    ? `<img src="${esc(game.cover_url)}" alt="Jaquette de ${esc(game.title)}">`
-    : coverGeneree(game.title);
+    ? `<img class="cover-fond" src="${esc(game.cover_url)}" alt="" aria-hidden="true">
+       <img class="cover-main" src="${esc(game.cover_url)}" alt="Jaquette de ${esc(game.title)}">`
+    : coverGeneree(game);
 
   // --- Identite -----------------------------------------------------------
   modal.$('#detail-name').textContent = game.title;
@@ -1506,7 +1526,12 @@ function bindEvents() {
         img.remove();
         return;
       }
-      img.outerHTML = coverGeneree(img.dataset.titre || '');
+      img.outerHTML = coverGeneree({
+        title: img.dataset.titre,
+        platform: img.dataset.plateforme,
+        region: img.dataset.region,
+        serial: img.dataset.serie,
+      });
     },
     true,
   );

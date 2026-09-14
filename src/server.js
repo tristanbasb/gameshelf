@@ -102,6 +102,7 @@ app.get('/cert.pem', (_req, res) => {
  * ----------------------------------------------------------------------- */
 
 const VERSIONED_ASSETS = [
+  'css/fonts.css',
   'css/style.css',
   'js/app.js',
   'js/api.js',
@@ -145,6 +146,7 @@ app.get(['/', '/index.html'], (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     res.type('html').send(
       html
+        .replace('/css/fonts.css', `/a/${version}/css/fonts.css`)
         .replace('/css/style.css', `/a/${version}/css/style.css`)
         .replace('/js/app.js', `/a/${version}/js/app.js`),
     );
