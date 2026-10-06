@@ -1,0 +1,34 @@
+# Verification automatique a chaque envoi : le test de bout en bout demarre
+# une instance isolee et deroule l'ensemble des routes.
+name: Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installation des dependances
+        run: npm ci --omit=dev --no-audit --no-fund
+
+      - name: Syntaxe des sources
+        run: |
+          for f in src/*.js src/routes/*.js scripts/*.js public/js/*.js; do
+            node --check "$f"
+          done
+
+      - name: Test de bout en bout
+        run: npm test
+
+      - name: Vulnerabilites des dependances
+        run: npm audit --omit=dev

@@ -138,9 +138,16 @@
   </aside>
 
   <main class="main">
+    <!-- La marque sert de titre a l'oeil ; le document, lui, a besoin d'un
+         titre de premier niveau pour qu'un lecteur d'ecran annonce ou il se
+         trouve. -->
+    <h1 class="visually-hidden">Collection de jeux vidéo</h1>
+
     <section class="toolbar">
       <div class="toolbar-title">
-        <span id="result-count"></span>
+        <!-- Seul le nombre de resultats est annonce a voix haute : annoncer
+             la grille entiere a chaque filtre noierait l'information. -->
+        <span id="result-count" aria-live="polite"></span>
         <span class="sub" id="result-sub" hidden></span>
         <span class="stat-chip" id="result-chip" hidden></span>
       </div>
@@ -175,7 +182,7 @@
 
     <section class="catalog" id="catalog">
       <div class="chips" id="active-filters"></div>
-      <div id="games-container" aria-live="polite"></div>
+      <div id="games-container"></div>
       <div class="pagination" id="pagination"></div>
     </section>
   </main>

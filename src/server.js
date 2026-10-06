@@ -5,9 +5,11 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { config, localAddresses } from './config.js';
-import { db } from './db.js';
+import { db, fusionnerJournal } from './db.js';
 import { loadOrCreateCertificate, CERT_FILE } from './tls.js';
 import { ValidationError } from './games.js';
+import { limite } from './limite.js';
+import { demarrerEntretien } from './uploads.js';
 import gamesRoutes from './routes/games.routes.js';
 import dataRoutes from './routes/data.routes.js';
 import externalRoutes from './routes/external.routes.js';
@@ -43,8 +45,56 @@ app.use((_req, res, next) => {
   next();
 });
 
+/* --------------------------------------------------------------------------
+ * Requetes venues d'un autre site
+ *
+ * L'application n'a pas d'authentification : toute personne sur le reseau
+ * local peut lire et modifier la collection, et c'est le compromis assume
+ * d'une installation domestique. Mais sans precaution ce compromis va plus
+ * loin qu'il n'y parait : n'importe quelle page web ouverte dans le
+ * navigateur de la maison peut poster vers l'API. Le navigateur envoie une
+ * requete simple — un formulaire suffit — sans jamais demander au serveur
+ * s'il l'accepte, et un seul appel a /api/import remplacerait la collection.
+ * « Ne pas exposer le port sur Internet » n'y change rien : c'est le
+ * navigateur lui-meme qui sert de pont.
+ *
+ * Sec-Fetch-Site est pose par le navigateur et aucun script de page ne peut
+ * le modifier. Quand il manque — navigateur ancien, curl, script — on retombe
+ * sur Origin, qui n'est pas falsifiable depuis une page non plus. Une requete
+ * sans l'un ni l'autre (curl, sonde de sante) reste acceptee : la protection
+ * vise le navigateur, seul a pouvoir etre manoeuvre a distance.
+ * ----------------------------------------------------------------------- */
+
+const METHODES_SURES = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+app.use((req, res, next) => {
+  if (METHODES_SURES.has(req.method)) return next();
+
+  const provenance = req.get('Sec-Fetch-Site');
+  const origine = req.get('Origin');
+  const refus = () =>
+    res.status(403).json({
+      error: 'Requete refusee : elle ne vient pas de l application',
+    });
+
+  if (provenance) {
+    // « none » : une adresse tapee a la main ou un favori, sans page a
+    // l'origine. « same-origin » : l'application elle-meme.
+    if (provenance !== 'same-origin' && provenance !== 'none') return refus();
+  } else if (origine && origine !== `${req.protocol}://${req.get('Host')}`) {
+    return refus();
+  }
+
+  next();
+});
+
+/*
+ * Seul le JSON est accepte comme corps de requete. Les formulaires encodes et
+ * le texte brut sont les deux seuls types qu'un navigateur envoie a un autre
+ * site sans autorisation prealable : ne pas les lire du tout ferme la porte
+ * une seconde fois. L'interface n'envoie que du JSON, ou un fichier.
+ */
 app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 /* --------------------------------------------------------------------------
  * Fichiers statiques
@@ -126,16 +176,26 @@ function assetVersion() {
   return hash.digest('hex').slice(0, 10);
 }
 
-// Ces URL sont uniques par version : elles peuvent etre gardees indefiniment.
-app.use(
-  '/a/:version',
-  express.static(publicDir, {
-    index: false,
-    immutable: true,
-    maxAge: '1y',
-    dotfiles: 'ignore',
-  }),
-);
+/*
+ * Ces URL sont uniques par version : elles peuvent etre gardees
+ * indefiniment. L'empreinte est verifiee avant de promettre un an de cache —
+ * sans quoi n'importe quel prefixe invente obtiendrait la meme promesse, et
+ * figerait dans un navigateur un fichier sous une adresse qui ne changera
+ * jamais.
+ */
+const EMPREINTE_VALIDE = /^[0-9a-f]{10}$/;
+
+const fichiersVersionnes = express.static(publicDir, {
+  index: false,
+  immutable: true,
+  maxAge: '1y',
+  dotfiles: 'ignore',
+});
+
+app.use('/a/:version', (req, res, next) => {
+  if (!EMPREINTE_VALIDE.test(req.params.version)) return next();
+  fichiersVersionnes(req, res, next);
+});
 
 app.get(['/', '/index.html'], (_req, res, next) => {
   fs.readFile(path.join(publicDir, 'index.html'), 'utf8', (err, html) => {
@@ -146,9 +206,9 @@ app.get(['/', '/index.html'], (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     res.type('html').send(
       html
-        .replace('/css/fonts.css', `/a/${version}/css/fonts.css`)
-        .replace('/css/style.css', `/a/${version}/css/style.css`)
-        .replace('/js/app.js', `/a/${version}/js/app.js`),
+        .replaceAll('/css/fonts.css', `/a/${version}/css/fonts.css`)
+        .replaceAll('/css/style.css', `/a/${version}/css/style.css`)
+        .replaceAll('/js/app.js', `/a/${version}/js/app.js`),
     );
   });
 });
@@ -192,6 +252,50 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+/*
+ * Garde-fous. Les plafonds sont choisis bien au-dessus d'un usage reel : la
+ * consultation d'une page fait une dizaine d'appels, un scan deux ou trois,
+ * et une collection se tient a la main, pas a la seconde.
+ */
+app.use('/api', limite({ nom: 'api', max: 600, secondes: 60 }));
+
+const limiteEcritures = limite({
+  nom: 'ecritures',
+  max: 120,
+  secondes: 60,
+  message: 'Trop de modifications d un coup, patientez un instant',
+});
+
+app.use('/api', (req, res, next) => {
+  if (METHODES_SURES.has(req.method)) return next();
+  // Le journal rejoint la base des que la reponse est partie : gameshelf.db
+  // reste a tout instant la collection complete.
+  res.once('finish', fusionnerJournal);
+  return limiteEcritures(req, res, next);
+});
+
+// Operations lourdes ou destructrices : chacune son compteur.
+app.use('/api/upload', limite({
+  nom: 'upload',
+  max: 60,
+  secondes: 600,
+  message: 'Trop d images televersees d affilee, patientez quelques minutes',
+}));
+// Un import se reprend souvent plusieurs fois de suite, le temps de corriger
+// le fichier : le plafond doit laisser la place a ces essais.
+app.use('/api/import', limite({
+  nom: 'import',
+  max: 20,
+  secondes: 600,
+  message: 'Trop d imports d affilee, patientez quelques minutes',
+}));
+app.use('/api/backup', limite({
+  nom: 'backup',
+  max: 10,
+  secondes: 600,
+  message: 'Trop de sauvegardes d affilee, patientez quelques minutes',
+}));
+
 app.use('/api', gamesRoutes);
 app.use('/api', dataRoutes);
 app.use('/api', externalRoutes);
@@ -207,7 +311,8 @@ app.use((_req, res) => {
 /* --------------------------------------------------------------------------
  * Gestion des erreurs
  * ----------------------------------------------------------------------- */
-// eslint-disable-next-line no-unused-vars -- Express identifie le handler d'erreur a ses 4 arguments
+// Express identifie le gestionnaire d'erreur a ses quatre arguments : le
+// dernier doit rester declare, meme inutilise.
 app.use((err, _req, res, _next) => {
   if (err instanceof ValidationError || err?.name === 'ValidationError') {
     return res.status(400).json({ error: err.message });
@@ -225,8 +330,14 @@ app.use((err, _req, res, _next) => {
   }
 
   console.error('[erreur]', err);
-  res.status(err?.status && err.status < 600 ? err.status : 500).json({
-    error: err?.status ? err.message : 'Erreur interne du serveur',
+  // Un code hors de la plage des erreurs HTTP ferait echouer la reponse
+  // elle-meme : on ne retient que ceux qui en sont.
+  const codeFourni = Number(err?.status);
+  const code = Number.isInteger(codeFourni) && codeFourni >= 400 && codeFourni <= 599
+    ? codeFourni
+    : 500;
+  res.status(code).json({
+    error: code === 500 ? 'Erreur interne du serveur' : err.message || 'Requete refusee',
   });
 });
 
@@ -255,6 +366,9 @@ server.listen(config.port, config.host, () => {
   console.log('');
   console.log(`  Donnees : ${config.dataDir}`);
 
+  // Jaquettes orphelines : au demarrage, puis une fois par heure.
+  demarrerEntretien();
+
   if (credentials) {
     console.log('');
     console.log('  Le certificat est auto-signe : le navigateur affichera un');
@@ -272,6 +386,9 @@ function shutdown(signal) {
   console.log(`\n${signal} recu, arret en cours...`);
   server.close(() => {
     try {
+      // Le fichier principal doit porter la collection complete, meme si
+      // personne ne redemarre le service avant la prochaine sauvegarde.
+      fusionnerJournal();
       db.close();
     } catch {
       /* deja fermee */

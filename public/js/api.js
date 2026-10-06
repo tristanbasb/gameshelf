@@ -8,18 +8,47 @@ export class ApiError extends Error {
   }
 }
 
+/*
+ * Delai maximal d'une requete.
+ *
+ * Sans garde, un serveur injoignable — telephone sorti du Wi-Fi, service
+ * arrete — laisse le bouton sur « Enregistrement… » indefiniment : on ne sait
+ * plus si la modification est passee ou non. Le televersement d'une image
+ * depuis un telephone demande davantage de temps que le reste.
+ */
+const DELAI_MS = 15000;
+const DELAI_FICHIER_MS = 60000;
+
+function signalDelai(ms) {
+  // AbortSignal.timeout manque sur les Safari anciens.
+  if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  const controleur = new AbortController();
+  setTimeout(() => controleur.abort(), ms);
+  return controleur.signal;
+}
+
 async function request(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: 'same-origin',
-    ...options,
-    headers: {
-      Accept: 'application/json',
-      ...(options.body && !(options.body instanceof FormData)
-        ? { 'Content-Type': 'application/json' }
-        : {}),
-      ...options.headers,
-    },
-  });
+  const fichier = options.body instanceof FormData;
+  let response;
+  try {
+    response = await fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      signal: options.signal ?? signalDelai(fichier ? DELAI_FICHIER_MS : DELAI_MS),
+      headers: {
+        Accept: 'application/json',
+        ...(options.body && !fichier ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (err) {
+    // Panne reseau ou delai depasse : fetch ne rejette pas autrement.
+    const expire = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    throw new ApiError(
+      expire ? 'Le serveur ne répond pas' : 'Connexion au serveur impossible',
+      0,
+    );
+  }
 
   if (response.status === 204) return null;
 

@@ -573,6 +573,23 @@ function showSkeleton() {
 const LOADING_DELAY_MS = 180;
 let loadingTimer = null;
 
+/*
+ * Numero du chargement en cours.
+ *
+ * Deux requetes lancees coup sur coup — on tape dans la recherche, on change
+ * de plateforme — ne reviennent pas forcement dans l'ordre. Sans repere, la
+ * reponse la plus lente repeint la grille par-dessus la plus recente, et
+ * l'affichage ne correspond plus aux filtres. Chaque chargement prend donc un
+ * numero, et ne peint que s'il est encore le dernier demande.
+ *
+ * La grille et la barre laterale comptent separement : rafraichir les
+ * compteurs apres un clic sur une etoile ne doit pas annuler un chargement de
+ * grille en cours.
+ */
+const dernier = { grille: 0, meta: 0 };
+const grilleSuivante = () => (dernier.grille += 1);
+const metaSuivante = () => (dernier.meta += 1);
+
 function beginLoading() {
   const container = $('#games-container');
   const hasContent = Boolean(container.querySelector('.card, table, .empty'));
@@ -589,7 +606,7 @@ function endLoading() {
   $('#games-container').classList.remove('is-loading');
 }
 
-async function loadGames() {
+async function loadGames(numero = grilleSuivante()) {
   const params = {
     ...Object.fromEntries(Object.entries(state.filters).filter(([, v]) => v)),
     sort: state.sort,
@@ -600,10 +617,14 @@ async function loadGames() {
 
   const result = await api.listGames(params);
 
+  // Une demande plus recente a ete lancee pendant l'attente : cette reponse
+  // ne decrit plus ce que l'on regarde.
+  if (numero !== dernier.grille) return null;
+
   // Une page vide au-dela de la derniere : on revient sur la derniere valide.
   if (result.items.length === 0 && result.page > result.pages) {
     state.page = result.pages;
-    return loadGames();
+    return loadGames(numero);
   }
 
   const container = $('#games-container');
@@ -641,12 +662,16 @@ async function loadGames() {
   return result;
 }
 
-async function loadMeta() {
-  state.meta = await api.meta();
+async function loadMeta(numero = metaSuivante()) {
+  const meta = await api.meta();
+  if (numero !== dernier.meta) return;
+  state.meta = meta;
   renderSidebar();
 }
 
 async function refresh({ withMeta = false } = {}) {
+  const numeroGrille = grilleSuivante();
+  const numeroMeta = withMeta ? metaSuivante() : 0;
   writeUrl();
   renderChips();
   renderSidebar();
@@ -654,12 +679,16 @@ async function refresh({ withMeta = false } = {}) {
   try {
     // Les deux requetes sont independantes : les enchainer doublerait
     // inutilement la latence a chaque changement de filtre.
-    await Promise.all([withMeta ? loadMeta() : null, loadGames()]);
+    await Promise.all([withMeta ? loadMeta(numeroMeta) : null, loadGames(numeroGrille)]);
   } catch (err) {
-    $('#games-container').innerHTML =
-      `<div class="empty"><h3>Chargement impossible</h3><p>${esc(err.message)}</p></div>`;
+    // Une erreur sur une demande deja depassee ne doit pas effacer la liste
+    // que le chargement suivant vient peut-etre d'afficher.
+    if (numeroGrille === dernier.grille) {
+      $('#games-container').innerHTML =
+        `<div class="empty"><h3>Chargement impossible</h3><p>${esc(err.message)}</p></div>`;
+    }
   } finally {
-    endLoading();
+    if (numeroGrille === dernier.grille) endLoading();
   }
 }
 

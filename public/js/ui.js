@@ -211,10 +211,49 @@ export function openModal(templateId, { onClose } = {}) {
     onClose?.();
   }
 
+  /*
+   * Elements que l'on peut atteindre au clavier dans la modale, dans l'ordre
+   * ou la touche Tab les parcourt. Recalcules a chaque pression : le contenu
+   * d'une fiche change au fil des clics, et les blocs vides sont masques.
+   */
+  function elementsFocusables() {
+    return [
+      ...root.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]),'
+        + ' select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+      // Un element dans un bloc masque n'occupe aucune place a l'ecran.
+    ].filter((el) => el.getClientRects().length > 0);
+  }
+
   function onKeydown(event) {
     if (event.key === 'Escape') {
       event.stopPropagation();
       close();
+      return;
+    }
+
+    /*
+     * Le focus reste dans la modale.
+     *
+     * Sans cela, Tab sortait du dialogue et parcourait la page restee
+     * derriere : on se retrouvait a modifier des filtres qu'on ne voyait
+     * plus, sans savoir comment revenir au formulaire.
+     */
+    if (event.key !== 'Tab') return;
+    const focusables = elementsFocusables();
+    if (focusables.length === 0) return;
+
+    const premier = focusables[0];
+    const dernier = focusables[focusables.length - 1];
+    const courant = document.activeElement;
+
+    if (event.shiftKey && (courant === premier || !root.contains(courant))) {
+      event.preventDefault();
+      dernier.focus();
+    } else if (!event.shiftKey && (courant === dernier || !root.contains(courant))) {
+      event.preventDefault();
+      premier.focus();
     }
   }
 

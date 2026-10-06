@@ -102,6 +102,27 @@ if (currentVersion < migrations.length) {
   applyAll();
 }
 
+/**
+ * Fusionne le journal d'ecriture dans le fichier principal de la base.
+ *
+ * En mode WAL, les ecritures recentes vivent dans gameshelf.db-wal, et la
+ * fusion n'a lieu d'elle-meme qu'une fois le journal devenu volumineux : le
+ * fichier gameshelf.db peut donc etre en retard de plusieurs jours. Copier
+ * « la base » sans son journal rend alors une collection perimee — et c'est
+ * exactement le geste qu'on fait d'instinct pour une sauvegarde.
+ *
+ * On fusionne donc apres chaque ecriture. Sur un inventaire de cette taille
+ * l'operation est imperceptible, et gameshelf.db est a tout moment la
+ * collection complete.
+ */
+export function fusionnerJournal() {
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch {
+    /* un lecteur tient la base : la fusion aura lieu au prochain passage */
+  }
+}
+
 /** Etat d'un exemplaire, du meilleur au plus abime. '' = non renseigne. */
 export const CONDITIONS = ['sealed', 'mint', 'good', 'fair', 'poor'];
 

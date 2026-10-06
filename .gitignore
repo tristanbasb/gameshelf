@@ -16,3 +16,6 @@ backups/
 
 # Configuration locale de l outil (chemins specifiques a la machine)
 .claude/
+
+# Dossier de travail du test de bout en bout (npm test)
+.test-*/

@@ -21,6 +21,7 @@ cleanup() {
   if [[ -n "$CREATED_ID" ]]; then
     curl -sk -X DELETE "$BASE_URL/api/games/$CREATED_ID" >/dev/null || true
   fi
+  rm -f ./._smoke_image.png ./._smoke_image_faux.png 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -229,6 +230,52 @@ if [[ -n "$asset_path" ]]; then
 else
   printf '%s  FAIL%s  aucune URL versionnee dans la page\n' "$c_red" "$c_reset"
   FAILURES=$((FAILURES + 1))
+fi
+
+# --- 11. Protections --------------------------------------------------------
+# L'application n'a pas d'authentification : n'importe quel appareil du reseau
+# peut ecrire. Mais une page web ouverte ailleurs ne doit pas pouvoir le faire
+# a travers le navigateur de la maison — un formulaire suffirait, et un seul
+# appel a /api/import remplacerait la collection.
+check "ecriture inter-site refusee -> 403" "$(status -X POST \
+  -H 'Sec-Fetch-Site: cross-site' -H 'Content-Type: application/json' \
+  -d '{"title":"__smoke_inter_site__"}' "$BASE_URL/api/games")" "403"
+check "suppression inter-site refusee -> 403" "$(status -X DELETE \
+  -H 'Sec-Fetch-Site: cross-site' "$BASE_URL/api/games/1")" "403"
+check "import inter-site refuse -> 403" "$(status -X POST \
+  -H 'Origin: https://ailleurs.invalid' -H 'Content-Type: application/json' \
+  -d '{"content":"[]","mode":"replace"}' "$BASE_URL/api/import")" "403"
+
+# L'interface, elle, doit continuer a ecrire normalement.
+origine_body="$(curl -sk -X POST -H 'Sec-Fetch-Site: same-origin' \
+  -H 'Content-Type: application/json' -d '{"title":"__smoke_meme_origine__"}' \
+  "$BASE_URL/api/games")"
+contains "ecriture de l application acceptee" "$origine_body" '"title":"__smoke_meme_origine__"'
+origine_id="$(printf '%s' "$origine_body" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)"
+[[ -n "$origine_id" ]] && curl -sk -X DELETE "$BASE_URL/api/games/$origine_id" >/dev/null
+
+# Les corps encodes en formulaire sont le vehicule d'une ecriture inter-site :
+# ils ne sont plus lus du tout.
+check "corps de formulaire ignore -> 400" "$(status -X POST \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data 'content=[{"title":"x"}]&mode=replace' "$BASE_URL/api/import")" "400"
+
+# Un prefixe de version invente ne doit pas obtenir la promesse d'un an de
+# cache sur un fichier qui changera.
+check "prefixe de version invente -> 404" "$(status "$BASE_URL/a/pasuneempreinte/js/app.js")" "404"
+
+# Le contenu d'une image est verifie, et non le type annonce : sans quoi
+# n'importe quel fichier peut etre deverse dans le dossier des jaquettes.
+if printf '<script>alert(1)</script>' > ./._smoke_image_faux.png 2>/dev/null \
+  && printf '\211PNG\r\n\032\n\000\000\000\015IHDR\000\000\000\001\000\000\000\001' \
+     > ./._smoke_image.png 2>/dev/null; then
+  check "image mensongere refusee -> 400" "$(status -X POST \
+    -F 'cover=@./._smoke_image_faux.png;type=image/png' "$BASE_URL/api/upload")" "400"
+  check "vraie image acceptee -> 201" "$(status -X POST \
+    -F 'cover=@./._smoke_image.png;type=image/png' "$BASE_URL/api/upload")" "201"
+else
+  printf '%s  --  %s dossier non inscriptible : verification des images ignoree\n' \
+    "$c_blue" "$c_reset"
 fi
 
 echo

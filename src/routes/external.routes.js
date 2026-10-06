@@ -25,8 +25,17 @@ async function rawgFetch(pathname, params = {}) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!response.ok) {
-    const err = new Error(`RAWG a repondu ${response.status}`);
-    err.status = response.status === 401 ? 502 : 502;
+    // Une cle refusee et un service en panne demandent deux gestes
+    // differents : le message doit dire lequel.
+    const explications = {
+      401: ['Cle RAWG refusee : verifiez RAWG_API_KEY dans le fichier .env', 503],
+      403: ['Cle RAWG refusee : verifiez RAWG_API_KEY dans le fichier .env', 503],
+      429: ['Quota RAWG atteint : reessayez dans quelques minutes', 503],
+    };
+    const [message, status] = explications[response.status]
+      || [`La recherche en ligne a repondu ${response.status}`, 502];
+    const err = new Error(message);
+    err.status = status;
     throw err;
   }
   return response.json();

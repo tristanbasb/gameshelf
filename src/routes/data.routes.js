@@ -1,8 +1,10 @@
 import express from 'express';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import multer from 'multer';
+import { EXTENSIONS_IMAGE, ENTETE_OCTETS, typeImageReel } from '../images.js';
 import { db } from '../db.js';
 import { config } from '../config.js';
 import { normalizeGame, insertMany, listGames, ValidationError } from '../games.js';
@@ -428,32 +430,59 @@ router.post('/import', (req, res) => {
  * Upload de jaquettes
  * ----------------------------------------------------------------------- */
 
-const ALLOWED_IMAGE_TYPES = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-  'image/avif': '.avif',
-};
-
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, config.uploadsDir),
     filename: (_req, file, cb) => {
-      const ext = ALLOWED_IMAGE_TYPES[file.mimetype] || '.bin';
+      const ext = EXTENSIONS_IMAGE[file.mimetype] || '.bin';
       cb(null, `${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}${ext}`);
     },
   }),
   limits: { fileSize: config.maxUploadBytes, files: 1 },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_IMAGE_TYPES[file.mimetype]) return cb(null, true);
+    if (EXTENSIONS_IMAGE[file.mimetype]) return cb(null, true);
     cb(new ValidationError('Format d image non supporte (JPEG, PNG, WebP, GIF ou AVIF)'));
   },
 });
 
-router.post('/upload', upload.single('cover'), (req, res) => {
+/**
+ * Verifie qu'un fichier recu est bien une image, d'apres ses premiers octets
+ * et non d'apres le type annonce par le navigateur — qui n'est qu'une
+ * declaration. Renvoie son nom definitif : il change si l'extension ne
+ * correspondait pas au contenu reel, car c'est elle qui determinera le type
+ * sous lequel le fichier sera servi ensuite.
+ */
+async function verifierImage(file) {
+  let entete = Buffer.alloc(0);
+  const descripteur = await fsp.open(file.path, 'r');
+  try {
+    const lecture = await descripteur.read(Buffer.alloc(ENTETE_OCTETS), 0, ENTETE_OCTETS, 0);
+    entete = lecture.buffer.subarray(0, lecture.bytesRead);
+  } finally {
+    await descripteur.close();
+  }
+
+  const type = typeImageReel(entete);
+  if (!type) {
+    await fsp.rm(file.path, { force: true });
+    throw new ValidationError("Ce fichier n'est pas une image (JPEG, PNG, WebP, GIF ou AVIF)");
+  }
+
+  const extension = EXTENSIONS_IMAGE[type];
+  if (file.filename.toLowerCase().endsWith(extension)) return file.filename;
+
+  const nom = file.filename.replace(/\.[^.]*$/, '') + extension;
+  await fsp.rename(file.path, path.join(config.uploadsDir, nom));
+  return nom;
+}
+
+router.post('/upload', upload.single('cover'), async (req, res, next) => {
   if (!req.file) return res.status(400).json({ error: 'Aucun fichier recu' });
-  res.status(201).json({ url: `/uploads/${req.file.filename}` });
+  try {
+    res.status(201).json({ url: `/uploads/${await verifierImage(req.file)}` });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

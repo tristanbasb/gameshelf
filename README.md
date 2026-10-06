@@ -221,6 +221,13 @@ locale. Voir [`.env.example`](.env.example).
 > **Aucune authentification** : toute personne ayant accès au réseau local peut
 > lire et modifier la collection. C'est le compromis assumé d'une installation
 > domestique. N'exposez pas le port sur Internet.
+>
+> En revanche, une page web ouverte ailleurs dans le navigateur **ne peut pas**
+> écrire dans la collection : toute requête de modification venue d'un autre
+> site est refusée, et seul le JSON est accepté comme corps de requête. Sans
+> cela, un simple formulaire sur une page quelconque aurait suffi à remplacer
+> l'inventaire — le navigateur de la maison servant de pont, que le port soit
+> exposé ou non.
 
 ---
 
@@ -295,9 +302,25 @@ Sauvegarde quotidienne par cron :
 > Une simple copie de `gameshelf.db` pendant que le service tourne peut être
 > incohérente (mode WAL). Utilisez toujours le script ou le bouton dédié.
 
+Le journal d'écriture est fusionné dans `gameshelf.db` après chaque
+modification : le fichier principal porte donc la collection complète, et non
+un état figé au dernier regroupement. Les jaquettes devenues orphelines —
+fiche supprimée, visuel remplacé, téléversement interrompu — sont retirées
+automatiquement une fois par heure.
+
 ---
 
 ## Vérifier une installation
+
+```bash
+npm test
+```
+
+Démarre une instance isolée sur un port libre, avec une base neuve dans un
+dossier temporaire, y déroule le test de bout en bout, puis nettoie : la
+collection n'est jamais touchée.
+
+Pour tester une instance déjà en service — le serveur, par exemple :
 
 ```bash
 ./scripts/smoke-test.sh https://localhost:3000
@@ -305,7 +328,9 @@ Sauvegarde quotidienne par cron :
 
 Le script teste l'ensemble des routes (lecture, création, modification, scan
 par code-barres, filtre des incomplets, validation des entrées, import, export,
-sauvegarde, pages statiques) et supprime les données de test qu'il a créées.
+sauvegarde, pages statiques, refus des écritures venues d'un autre site,
+vérification du contenu des images) et supprime les données de test qu'il a
+créées.
 
 ---
 
