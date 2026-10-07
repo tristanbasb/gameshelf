@@ -1,6 +1,6 @@
 [Unit]
 Description=GameVault - inventaire de collection de jeux video
-Documentation=https://github.com/
+Documentation=https://github.com/tristanbasb/gameshelf
 After=network-online.target
 Wants=network-online.target
 

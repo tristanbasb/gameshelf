@@ -281,7 +281,11 @@ export → import restitue la collection à l'identique.
 ## Sauvegardes
 
 Les données tiennent dans `data/` : la base `gameshelf.db`, le dossier
-`uploads/` et le certificat `tls/`.
+`uploads/`, le certificat `tls/` et les sauvegardes `backups/`.
+
+Un import en mode **Remplacer** prend de lui-même une copie de la base juste
+avant d'effacer quoi que ce soit : elle est écrite dans `data/backups/` sous
+le nom `avant-import-<date>.db`, et les cinq dernières sont conservées.
 
 Depuis l'interface, **Import / export → Sauvegarde .db** télécharge une copie
 cohérente de la base sans arrêter le service.
@@ -289,7 +293,7 @@ cohérente de la base sans arrêter le service.
 En ligne de commande :
 
 ```bash
-node scripts/backup.js                 # écrit dans ./backups, garde les 14 dernières
+node scripts/backup.js                 # écrit dans data/backups, garde les 14 dernières
 docker compose exec gameshelf node scripts/backup.js
 ```
 
@@ -367,14 +371,22 @@ Paramètres de `GET /api/games` : `search`, `ean`, `serial`, `platform`,
 ```
 src/            serveur Express, accès SQLite, routes
   config.js     lecture de la configuration et du .env
-  db.js         schéma et migrations
+  db.js         schéma, migrations, fusion du journal
   tls.js        certificat local auto-signé
   games.js      validation et requêtes sur les jeux
   csv.js        lecture / écriture CSV
+  images.js     reconnaissance du type réel d'une image
+  limite.js     plafonds de débit par adresse
+  uploads.js    entretien des jaquettes orphelines
   routes/       jeux, import-export, recherche externe
 public/         interface (HTML, CSS, JS natif — aucun build)
 deploy/         install.sh, update.sh, unité systemd
-scripts/        sauvegarde, smoke-test
+scripts/        sauvegarde, test de bout en bout, smoke-test
+```
+
+```bash
+npm run lint    # analyse statique (ESLint, seule dépendance de développement)
+npm test        # instance isolée + test de bout en bout
 ```
 
 Le schéma évolue par migrations incrémentales (`PRAGMA user_version` dans

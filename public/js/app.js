@@ -391,9 +391,6 @@ function gameCard(game) {
   const card = document.createElement('article');
   card.className = 'card';
   card.dataset.id = game.id;
-  card.tabIndex = 0;
-  card.setAttribute('role', 'button');
-  card.setAttribute('aria-label', `Voir la fiche de ${game.title}`);
 
   const favLabel = game.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris';
   const manque = missingParts(game);
@@ -404,6 +401,17 @@ function gameCard(game) {
       ${mediaMarkup(game)}
       <div class="card-scrim"></div>
     </div>
+
+    <!--
+      La tuile s'ouvre d'un clic n'importe ou, mais au clavier il faut une
+      cible reelle. Un bouton transparent couvre la jaquette : il porte le
+      nom du jeu pour un lecteur d'ecran, et c'est lui qui recoit le focus.
+      L'etoile, posee au-dessus, reste atteignable separement — deux boutons
+      cote a cote, et non l'un dans l'autre.
+    -->
+    <button type="button" class="card-ouvrir">
+      <span class="visually-hidden">Voir la fiche de ${esc(game.title)}</span>
+    </button>
 
     <div class="card-top">
       <span style="display:flex;gap:5px;min-width:0">
@@ -454,10 +462,16 @@ function renderTable(items) {
   const wrap = document.createElement('div');
   wrap.className = 'table-wrap';
 
+  // Les colonnes triables sont de vrais boutons : un <th> cliquable ne se
+  // rejoint pas au clavier, et aria-sort dit dans quel sens on a trie.
   const head = TABLE_COLUMNS.map((col) => {
-    if (!col.key) return `<th style="cursor:default">${esc(col.label)}</th>`;
-    const arrow = state.sort === col.key ? (state.dir === 'asc' ? ' ↑' : ' ↓') : '';
-    return `<th data-sort="${col.key}">${esc(col.label)}${arrow}</th>`;
+    if (!col.key) return `<th scope="col" style="cursor:default">${esc(col.label)}</th>`;
+    const actif = state.sort === col.key;
+    const sens = actif ? (state.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+    const arrow = actif ? (state.dir === 'asc' ? ' ↑' : ' ↓') : '';
+    return `<th scope="col" aria-sort="${sens}">
+      <button type="button" class="th-tri" data-sort="${col.key}">${esc(col.label)}${arrow}</button>
+    </th>`;
   }).join('');
 
   const body = items
@@ -470,7 +484,7 @@ function renderTable(items) {
             ${game.cover_url
               ? `<img class="mini-cover" src="${esc(game.cover_url)}" alt="" loading="lazy">`
               : '<span class="mini-cover"></span>'}
-            <span>${game.favorite ? '★ ' : ''}${esc(game.title)}</span>
+            <button type="button" class="cell-ouvrir">${game.favorite ? '★ ' : ''}${esc(game.title)}</button>
           </span>
         </td>
         <td>${esc(game.platform) || '—'}</td>
@@ -1059,8 +1073,6 @@ const CHECK_ICON =
 const CHECK_ICON_LARGE =
   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 
-const CROSS_ICON =
-  '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 const CROSS_ICON_LARGE =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
@@ -1525,7 +1537,8 @@ function openIoModal() {
     if (mode === 'replace') {
       const ok = await confirmDialog(
         'Toute la collection actuelle sera effacée avant l’import. '
-        + 'Contrairement à la suppression d’un jeu, ceci ne peut pas être annulé.',
+        + 'Une copie de la base est mise de côté juste avant, dans '
+        + 'data/backups, mais l’opération ne s’annule pas depuis l’interface.',
         {
           title: 'Remplacer toute la collection ?',
           confirmLabel: 'Tout remplacer',
@@ -1557,10 +1570,16 @@ function openIoModal() {
              <ul style="margin:8px 0 0;padding-left:18px">${result.details.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>
            </details>`
         : '';
+      // Un remplacement a mis la collection precedente de cote : le dire,
+      // c'est la difference entre une fausse manoeuvre et une frayeur.
+      const filet = result.backup
+        ? `<div style="margin-top:8px">La collection précédente a été copiée dans
+             <code>data/backups/${esc(result.backup)}</code>.</div>`
+        : '';
       report.innerHTML = `
         <div class="form-error" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent)">
           ${result.imported} jeu(x) importé(s), ${result.skipped} doublon(s) ignoré(s),
-          ${result.invalid} ligne(s) invalide(s).${details}
+          ${result.invalid} ligne(s) invalide(s).${filet}${details}
         </div>`;
       toast(`${result.imported} jeu(x) importé(s)`);
       refresh({ withMeta: true });
@@ -1577,9 +1596,19 @@ function openIoModal() {
    Theme
    ========================================================================== */
 
+/*
+ * Couleur annoncee au systeme : c'est elle qui teinte la barre d'etat du
+ * telephone et le cadre du navigateur. Fixee dans la page, elle restait noire
+ * au-dessus d'une interface claire.
+ */
+const COULEUR_SYSTEME = { dark: '#0c0c0e', light: '#f2f2f4' };
+
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   store.set('gameshelf-theme', theme);
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', COULEUR_SYSTEME[theme] || COULEUR_SYSTEME.dark);
   $('#icon-theme').innerHTML =
     theme === 'dark'
       ? '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'
@@ -1697,13 +1726,9 @@ function bindEvents() {
     if (row) openGame(row.dataset.id);
   });
 
-  $('#games-container').addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    const card = event.target.closest('.card[data-id]');
-    if (!card) return;
-    event.preventDefault();
-    openGame(card.dataset.id);
-  });
+  // Pas de gestionnaire clavier ici : la tuile et la ligne de tableau portent
+  // desormais un vrai bouton, qui declenche son clic sur Entree et Espace. En
+  // garder un second ouvrait la fiche deux fois.
 
   // Tri
   $('#sort').addEventListener('change', (event) => {

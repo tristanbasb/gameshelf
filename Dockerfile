@@ -13,7 +13,9 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev --no-audit --no-fund
+# npm ci honore package-lock.json : l image reconstruite dans six mois
+# embarquera exactement les memes versions qu aujourd hui.
+RUN npm ci --omit=dev --no-audit --no-fund
 
 # --------------------------------------------------------------------------
 # Etape 2 : image finale

@@ -16,7 +16,7 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [[ -d "$APP_DIR" ]] || { echo "Installation introuvable dans ${APP_DIR}." >&2; exit 1; }
 
 echo "==> Sauvegarde de la base"
-sudo -u "$APP_NAME" node "$APP_DIR/scripts/backup.js" "$APP_DIR/backups" || \
+sudo -u "$APP_NAME" node "$APP_DIR/scripts/backup.js" || \
   echo "  (sauvegarde ignoree : la base n'existe peut-etre pas encore)"
 
 echo "==> Recuperation des sources"

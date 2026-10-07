@@ -93,8 +93,14 @@ app.use((req, res, next) => {
  * le texte brut sont les deux seuls types qu'un navigateur envoie a un autre
  * site sans autorisation prealable : ne pas les lire du tout ferme la porte
  * une seconde fois. L'interface n'envoie que du JSON, ou un fichier.
+ *
+ * L'import transporte un fichier entier dans le corps de la requete : c'est
+ * la seule route qui a besoin de place. Ailleurs, une fiche de jeu tient
+ * largement dans un mega-octet, et le plafond borne ce qu'un appel peut
+ * faire tenir en memoire.
  */
-app.use(express.json({ limit: '25mb' }));
+app.use('/api/import', express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 /* --------------------------------------------------------------------------
  * Fichiers statiques

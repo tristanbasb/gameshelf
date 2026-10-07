@@ -6,7 +6,9 @@
 
 /** Decoupe un texte CSV en tableau de tableaux. */
 export function parseCsv(text, delimiter = ',') {
-  const input = String(text ?? '').replace(/^﻿/, ''); // retire le BOM Excel
+  // Le BOM d'Excel s'ecrit en sequence d'echappement : un caractere
+  // invisible dans le source se perd au premier copier-coller.
+  const input = String(text ?? '').replace(/^\uFEFF/, '');
   const rows = [];
   let row = [];
   let field = '';
@@ -102,5 +104,5 @@ const escapeCell = (value) => {
 export function objectsToCsv(rows, columns) {
   const header = columns.map(escapeCell).join(',');
   const body = rows.map((row) => columns.map((col) => escapeCell(row[col])).join(','));
-  return `﻿${[header, ...body].join('\r\n')}\r\n`;
+  return `\uFEFF${[header, ...body].join('\r\n')}\r\n`;
 }

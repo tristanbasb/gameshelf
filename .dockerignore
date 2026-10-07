@@ -3,7 +3,14 @@ data
 backups
 .git
 .gitignore
+.gitattributes
+.editorconfig
+.github
+.claude
+.test-*
+eslint.config.js
 .env
 *.log
 README.md
+LICENSE
 deploy

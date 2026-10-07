@@ -39,7 +39,7 @@
   <div class="search-wrap">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input type="search" id="search" class="input" placeholder="Titre, plateforme, tag, code-barres… (Ctrl + K)" autocomplete="off" aria-label="Rechercher">
-    <kbd class="kbd">Ctrl K</kbd>
+    <kbd class="kbd" aria-hidden="true">Ctrl K</kbd>
   </div>
 
   <div class="topbar-actions">
@@ -222,7 +222,7 @@
           Photographier le code
         </label>
         <input type="file" id="scan-photo" accept="image/*" capture="environment" hidden>
-        <p class="scanner-status" id="scanner-status">Cadrez le code-barres bien à plat, entier dans l’image.</p>
+        <p class="scanner-status" id="scanner-status" role="status">Cadrez le code-barres bien à plat, entier dans l’image.</p>
 
         <div class="field" style="margin-top:14px">
           <label for="scan-manual">Ou saisir le code à la main</label>
@@ -233,7 +233,7 @@
           </div>
         </div>
 
-        <div id="scan-result" style="margin-top:16px"></div>
+        <div id="scan-result" style="margin-top:16px" aria-live="polite"></div>
       </div>
 
       <div class="modal-foot">

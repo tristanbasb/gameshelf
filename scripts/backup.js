@@ -13,7 +13,13 @@ import { db } from '../src/db.js';
 import { config } from '../src/config.js';
 
 const KEEP = 14;
-const targetDir = path.resolve(process.argv[2] || path.join(config.root, 'backups'));
+/*
+ * Par defaut dans data/backups, a cote des copies prises avant un import qui
+ * remplace tout : un seul endroit ou chercher. C'est aussi le seul dossier
+ * que le service a le droit d'ecrire une fois durci par systemd, ce qui rend
+ * une minuterie possible sans rien assouplir.
+ */
+const targetDir = path.resolve(process.argv[2] || config.backupsDir);
 
 fs.mkdirSync(targetDir, { recursive: true });
 

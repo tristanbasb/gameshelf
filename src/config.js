@@ -45,6 +45,11 @@ const int = (value, fallback) => {
 const dataDir = path.resolve(ROOT, process.env.DATA_DIR || './data');
 fs.mkdirSync(dataDir, { recursive: true });
 fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true });
+// Sauvegardes automatiques et fichiers de passage. Dans data/ et non a la
+// racine : c'est le seul dossier que le service a le droit d'ecrire une fois
+// le durcissement systemd en place.
+fs.mkdirSync(path.join(dataDir, 'backups'), { recursive: true });
+fs.mkdirSync(path.join(dataDir, 'tmp'), { recursive: true });
 
 /**
  * Adresses IPv4 locales, utilisees pour le certificat et les URL affichees.
@@ -80,6 +85,8 @@ export const config = {
   host: process.env.HOST || '0.0.0.0',
   dataDir,
   uploadsDir: path.join(dataDir, 'uploads'),
+  backupsDir: path.join(dataDir, 'backups'),
+  tmpDir: path.join(dataDir, 'tmp'),
   dbFile: path.join(dataDir, 'gameshelf.db'),
 
   // HTTPS auto-signe : indispensable pour que la camera du telephone

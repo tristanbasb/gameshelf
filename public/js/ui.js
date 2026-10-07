@@ -153,7 +153,6 @@ export function toast(message, type = 'success', { duration = 4000, action } = {
   text.style.flex = '1';
   el.appendChild(text);
 
-  let timer;
   const dismiss = () => {
     clearTimeout(timer);
     el.style.transition = 'opacity .2s';
@@ -174,7 +173,9 @@ export function toast(message, type = 'success', { duration = 4000, action } = {
   }
 
   container.appendChild(el);
-  timer = setTimeout(dismiss, duration);
+  // Declare apres `dismiss`, qui s'y refere : la notification ne peut etre
+  // renvoyee qu'une fois affichee, donc apres cette ligne.
+  const timer = setTimeout(dismiss, duration);
 }
 
 /* -------------------------------------------------------------------------- */

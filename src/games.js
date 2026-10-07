@@ -80,7 +80,16 @@ export function normalizeTags(value) {
 function normalizeCoverUrl(value) {
   const raw = String(value ?? '').trim().slice(0, 1000);
   if (!raw) return '';
-  if (raw.startsWith('/uploads/')) return raw;
+  if (raw.startsWith('/uploads/')) {
+    // Seul le nom du fichier est retenu. Un chemin relatif glisse dans
+    // l'adresse ne menerait nulle part — le serveur de fichiers le refuse —
+    // mais il n'a rien a faire en base pour autant.
+    const nom = raw.slice('/uploads/'.length).split(/[?#]/)[0].split('/').pop();
+    if (!nom || nom === '.' || nom === '..') {
+      throw new ValidationError('Image : nom de fichier invalide');
+    }
+    return `/uploads/${nom}`;
+  }
   try {
     const url = new URL(raw);
     if (url.protocol === 'http:' || url.protocol === 'https:') return url.toString();

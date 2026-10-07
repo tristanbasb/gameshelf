@@ -10,14 +10,18 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "lint": "eslint .",
     "test": "bash scripts/test.sh",
     "backup": "node scripts/backup.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.2.0",
-    "express": "^4.21.2",
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1",
     "multer": "^2.0.1"
   },
   "license": "MIT",
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.39.5"
+  }
 }

@@ -72,11 +72,39 @@ export function balayerJaquettes() {
   return retires;
 }
 
-/** Lance le balayage au demarrage, puis a intervalle regulier. */
+/**
+ * Vide les fichiers de passage : copies de la base preparees pour un
+ * telechargement que personne n'a mene a son terme. Ils ne servent qu'a la
+ * requete qui les cree.
+ */
+export function viderFichiersDePassage() {
+  let retires = 0;
+  try {
+    for (const nom of fs.readdirSync(config.tmpDir)) {
+      const fichier = path.join(config.tmpDir, nom);
+      try {
+        const etat = fs.statSync(fichier);
+        if (!etat.isFile()) continue;
+        if (Date.now() - etat.mtimeMs < DELAI_GRACE_MS) continue;
+        fs.rmSync(fichier, { force: true });
+        retires += 1;
+      } catch {
+        /* fichier disparu entre-temps */
+      }
+    }
+  } catch {
+    /* dossier absent */
+  }
+  return retires;
+}
+
+/** Lance l'entretien au demarrage, puis a intervalle regulier. */
 export function demarrerEntretien() {
   const passer = () => {
-    const retires = balayerJaquettes();
-    if (retires) console.log(`  ${retires} jaquette(s) orpheline(s) supprimee(s)`);
+    const jaquettes = balayerJaquettes();
+    if (jaquettes) console.log(`  ${jaquettes} jaquette(s) orpheline(s) supprimee(s)`);
+    const passages = viderFichiersDePassage();
+    if (passages) console.log(`  ${passages} fichier(s) de passage supprime(s)`);
   };
   passer();
   setInterval(passer, PERIODE_MS).unref();

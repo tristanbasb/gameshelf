@@ -33,7 +33,9 @@
   --text: #e6e3dc;
   --text-strong: #efebe3;
   --text-muted: #8b8b93;
-  --text-faint: #66666e;
+  /* Releve pour rester lisible : a #66666e le rapport de contraste
+     tombait a 3,43:1, sous le seuil de 4,5:1 des petits textes. */
+  --text-faint: #7a7a82;
 
   /* L'accent est le papier lui-meme : l'action principale se detache par la
      lumiere, pas par une couleur qui disputerait la vedette aux jaquettes. */
@@ -99,7 +101,7 @@
   --text: #26262b;
   --text-strong: #111114;
   --text-muted: #5f5f68;
-  --text-faint: #8a8a93;
+  --text-faint: #6a6a73;
 
   --accent: #141417;
   --accent-hover: #000000;
@@ -799,7 +801,7 @@ label {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--encre) 52%, transparent);
+  color: color-mix(in srgb, var(--encre) 62%, transparent);
   transition: opacity 0.2s;
 }
 /* Au survol, l'inventaire de l'exemplaire prend la place de la reference. */
@@ -833,6 +835,28 @@ label {
 }
 .card-media:has(.cover-genere) .card-scrim { display: none; }
 
+/*
+ * Cible clavier de la tuile. Transparent et sans bordure, il couvre la
+ * jaquette ; les bandeaux du haut et du bas passent au-dessus pour que
+ * l'etoile reste cliquable et les pastilles survolables. A la souris, le
+ * clic sur n'importe quel point de la tuile ouvre la fiche de toute facon.
+ */
+.card-ouvrir {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+.card-ouvrir:focus-visible { outline: none; }
+.card:has(.card-ouvrir:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .card-top {
   position: absolute;
   top: 8px; left: 8px; right: 8px;
@@ -840,15 +864,19 @@ label {
   align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
-  z-index: 1;
+  z-index: 3;
 }
 
 .card-bottom {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   padding: 10px 11px;
-  z-index: 1;
+  z-index: 3;
+  /* Le texte ne doit pas intercepter le clic destine au bouton d'ouverture ;
+     les pastilles, elles, gardent leur infobulle au survol. */
+  pointer-events: none;
 }
+.card-bottom .card-parts { pointer-events: auto; }
 
 .card-title {
   font-family: var(--font-etroite);
@@ -989,7 +1017,21 @@ table.games thead th {
   border-bottom: 1px solid var(--border);
   cursor: pointer; user-select: none;
 }
-table.games thead th:hover { color: var(--text-strong); }
+/* Les en-tetes triables et les titres de ligne sont des boutons : ils ne
+   doivent rien changer a l'allure du tableau. */
+.th-tri, .cell-ouvrir {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cell-ouvrir { white-space: normal; }
+table.games thead th:hover, table.games thead th:has(.th-tri:hover) { color: var(--text-strong); }
 table.games tbody tr { border-bottom: 1px solid var(--border-soft); cursor: pointer; transition: background 0.12s; }
 table.games tbody tr:last-child { border-bottom: 0; }
 table.games tbody tr:hover { background: var(--surface); }

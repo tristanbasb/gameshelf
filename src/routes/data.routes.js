@@ -97,10 +97,20 @@ router.get('/export', (req, res) => {
 
 /** Copie coherente de la base SQLite (utilise l'API backup, sans arret du service). */
 router.get('/backup', async (_req, res, next) => {
-  const tmpFile = path.join(config.dataDir, `backup-${Date.now()}.db`);
+  // Dans data/tmp plutot qu'a cote de la base : un telechargement interrompu
+  // ne laisse plus un fichier d'allure officielle au milieu des donnees.
+  const tmpFile = path.join(config.tmpDir, `backup-${Date.now()}.db`);
   try {
     await db.backup(tmpFile);
-    res.download(tmpFile, `gameshelf-${new Date().toISOString().slice(0, 10)}.db`, (err) => {
+    /*
+     * dotfiles: 'allow' — le refus par defaut porte sur le chemin entier, et
+     * non sur le seul nom du fichier. Une installation rangee sous un dossier
+     * cache (~/.local/share/gameshelf, par exemple) voyait donc sa sauvegarde
+     * refusee par un 404, alors que le fichier etait bien la.
+     */
+    const options = { dotfiles: 'allow' };
+    const nom = `gameshelf-${new Date().toISOString().slice(0, 10)}.db`;
+    res.download(tmpFile, nom, options, (err) => {
       fs.rm(tmpFile, { force: true }, () => {});
       if (err && !res.headersSent) next(err);
     });
@@ -345,7 +355,34 @@ function mapRow(raw, { defaultPlatform = '', tracked = new Set(PART_KEYS) } = {}
   return row;
 }
 
-router.post('/import', (req, res) => {
+/*
+ * Copie de securite avant un import qui remplace tout.
+ *
+ * « Remplacer » efface la collection entiere en une requete. Si le fichier
+ * se revele mauvais — mauvaise colonne, mauvais fichier, mauvais mode — il
+ * n'y avait rien pour revenir en arriere. La copie est prise juste avant, et
+ * les cinq dernieres sont conservees.
+ */
+const COPIES_AVANT_IMPORT = 5;
+
+async function sauvegarderAvantRemplacement() {
+  const horodatage = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const nom = `avant-import-${horodatage}.db`;
+  await db.backup(path.join(config.backupsDir, nom));
+
+  const anciennes = fs
+    .readdirSync(config.backupsDir)
+    .filter((f) => f.startsWith('avant-import-'))
+    .sort()
+    .reverse()
+    .slice(COPIES_AVANT_IMPORT);
+  for (const ancienne of anciennes) {
+    fs.rmSync(path.join(config.backupsDir, ancienne), { force: true });
+  }
+  return nom;
+}
+
+router.post('/import', async (req, res, next) => {
   const { content, format = 'json', mode = 'merge', defaultPlatform = '' } = req.body || {};
   if (!content || typeof content !== 'string') {
     return res.status(400).json({ error: 'Aucun contenu a importer' });
@@ -397,6 +434,16 @@ router.post('/import', (req, res) => {
 
   let skipped = 0;
   let imported = 0;
+  let sauvegarde = null;
+
+  if (mode === 'replace') {
+    try {
+      sauvegarde = await sauvegarderAvantRemplacement();
+    } catch (err) {
+      // Mieux vaut ne rien remplacer que remplacer sans filet.
+      return next(err);
+    }
+  }
 
   const run = db.transaction(() => {
     if (mode === 'replace') {
@@ -423,6 +470,9 @@ router.post('/import', (req, res) => {
     skipped,
     invalid: errors.length,
     details: errors.slice(0, 20),
+    // Presente seulement sur un remplacement : c'est la ou l'on peut avoir
+    // besoin de revenir en arriere.
+    backup: sauvegarde,
   });
 });
 
