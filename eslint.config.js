@@ -83,6 +83,26 @@ export default [
         console: 'readonly',
         alert: 'readonly',
         getComputedStyle: 'readonly',
+        ResizeObserver: 'readonly',
+        CSS: 'readonly',
+        PointerEvent: 'readonly',
+      },
+    },
+    rules: communs,
+  },
+  {
+    // Service worker : ni window ni document, mais self, caches et fetch.
+    files: ['public/sw.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'script',
+      globals: {
+        self: 'readonly',
+        caches: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
     rules: communs,
