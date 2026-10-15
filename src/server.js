@@ -157,30 +157,40 @@ app.get('/cert.pem', (_req, res) => {
  * dossier versionne, sans avoir a reecrire le code servi.
  * ----------------------------------------------------------------------- */
 
-const VERSIONED_ASSETS = [
-  'css/fonts.css',
-  'css/style.css',
-  'js/app.js',
-  'js/api.js',
-  'js/ui.js',
-  'js/barcode.js',
-  'js/scan-worker.js',
-  'js/vendor/zxing.min.js',
-];
+/*
+ * Dossiers dont le contenu entre dans l'empreinte. Ils sont parcourus en
+ * entier plutot que listes fichier par fichier : un module ajoute a
+ * l'interface est pris en compte sans que personne n'ait a y penser.
+ */
+const VERSIONED_DIRS = ['css', 'js', 'fonts'];
+
+function* fichiersDe(dossier) {
+  let entrees;
+  try {
+    entrees = fs.readdirSync(dossier, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entree of entrees.sort((a, b) => a.name.localeCompare(b.name))) {
+    const chemin = path.join(dossier, entree.name);
+    if (entree.isDirectory()) yield* fichiersDe(chemin);
+    else if (entree.isFile()) yield chemin;
+  }
+}
 
 function assetVersion() {
   const hash = crypto.createHash('sha1');
-  for (const relative of VERSIONED_ASSETS) {
-    try {
-      const { mtimeMs, size } = fs.statSync(path.join(publicDir, relative));
-      hash.update(`${relative}:${mtimeMs}:${size};`);
-    } catch {
-      // Fichier absent : l'empreinte change, ce qui est le comportement voulu.
-      hash.update(`${relative}:absent;`);
+  for (const dossier of VERSIONED_DIRS) {
+    for (const fichier of fichiersDe(path.join(publicDir, dossier))) {
+      const { mtimeMs, size } = fs.statSync(fichier);
+      hash.update(`${path.relative(publicDir, fichier)}:${mtimeMs}:${size};`);
     }
   }
   return hash.digest('hex').slice(0, 10);
 }
+
+/** Les references /css/, /js/ et /fonts/ de la page pointent vers la version courante. */
+const REFERENCE_VERSIONNEE = /(href|src)="\/(css|js|fonts)\//g;
 
 /*
  * Ces URL sont uniques par version : elles peuvent etre gardees
@@ -210,12 +220,7 @@ app.get(['/', '/index.html'], (_req, res, next) => {
     // La page elle-meme n'est jamais mise en cache : c'est elle qui porte
     // l'empreinte, elle doit donc toujours etre relue.
     res.setHeader('Cache-Control', 'no-store');
-    res.type('html').send(
-      html
-        .replaceAll('/css/fonts.css', `/a/${version}/css/fonts.css`)
-        .replaceAll('/css/style.css', `/a/${version}/css/style.css`)
-        .replaceAll('/js/app.js', `/a/${version}/js/app.js`),
-    );
+    res.type('html').send(html.replace(REFERENCE_VERSIONNEE, `$1="/a/${version}/$2/`));
   });
 });
 
