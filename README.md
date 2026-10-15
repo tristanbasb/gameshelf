@@ -19,34 +19,54 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 
 - **Fiche par jeu** : titre, plateforme, région, serial éditeur, code-barres,
   quantité, état, complétude, ISO, tags, visuel, notes libres, favori.
-- **Scan de code-barres** : ouvrez la caméra du téléphone, visez le dos du
-  boîtier, et l'application répond immédiatement — soit « ✓ vous l'avez déjà »
-  avec la quantité, l'état et les pièces manquantes, soit une proposition
-  d'ajout avec le code déjà rempli.
-- **Complétude** : cochez ce que contient l'exemplaire (boîte, jaquette papier,
-  notice, disque ou cartouche). La vue **Incomplets** liste d'un coup tout ce
-  qui est amputé d'une pièce.
-- **Recherche instantanée** sur le titre, la plateforme, la région, le serial,
-  les tags, les notes et le code-barres. Insensible aux accents et à la casse
-  — « asterix » trouve « Astérix » — et multi-mots dans n'importe quel ordre :
-  « daxter jak » trouve « Jak and Daxter ».
-- **Filtres** par état, plateforme, région, tag, favoris, incomplets et
-  « sans ISO » — combinables, et reflétés dans l'URL.
-- **Saisie en chaîne** : le bouton **Enregistrer et suivant** garde la fiche
-  ouverte, conserve la plateforme et l'état, vide le reste et replace le
-  curseur sur le titre. Cataloguer une étagère revient à enchaîner
-  titre → Entrée. Ces deux valeurs sont mémorisées d'une session à l'autre.
-- **Deux affichages** : grille de visuels, ou tableau triable colonne par
-  colonne. Pagination réglable, avec une option **Tout afficher** (400 fiches
-  s'affichent en une vingtaine de millisecondes).
+- **« Est-ce que je l'ai ? »** : photographiez le code-barres au dos du
+  boîtier (ou tapez ses chiffres), et la réponse tombe aussitôt — « déjà dans
+  votre collection » avec l'état et les pièces manquantes, ou « pas dans votre
+  collection » avec l'ajout pré-rempli. La réponse vient de la copie de la
+  collection gardée sur le téléphone : elle fonctionne **aussi en magasin,
+  loin du Wi-Fi de la maison**.
+- **Recherche instantanée**, sans aller-retour avec le serveur : le titre, la
+  plateforme, la région, le serial, les tags, les notes et le code-barres.
+  Insensible aux accents et à la casse — « asterix » trouve « Astérix » —, les
+  mots dans n'importe quel ordre — « daxter jak » trouve « Jak and Daxter ».
+  Les passages trouvés sont surlignés, et une faute de frappe propose le titre
+  le plus proche. La recherche comprend aussi l'état de la boîte :
+  « ps2 sans notice », « incomplet », « sans iso ».
+- **Trois affichages** :
+  - **Jaquettes**, chacune à la proportion réelle de son boîtier — un jeu
+    Switch est plus étroit qu'un jeu PS2, une boîte de N64 plus large que
+    haute ;
+  - **Étagère**, les tranches des boîtiers rangées par plateforme, à leur
+    épaisseur et leur hauteur réelles, aux couleurs de chaque console ;
+  - **Liste**, compacte, avec les colonnes utiles.
+- **La frise** : sous la recherche, toute la collection d'un coup d'œil, une
+  tranche par jeu. Elle s'allume sur les jeux trouvés pendant la frappe ; on la
+  parcourt du doigt (ou à la souris) pour voir passer les titres, et on relâche
+  pour ouvrir la fiche.
+- **Corrections en un geste** depuis la fiche : l'état, ce que contient la
+  boîte, l'ISO, le nombre d'exemplaires, le favori. Retrouver une notice au
+  fond d'un carton, c'est un toucher.
+- **Filtres** par plateforme, état, région, tag, favoris, incomplets et
+  « sans ISO » — combinables, avec le nombre de jeux que chacun laisserait, et
+  reflétés dans l'adresse.
+- **Bilan** : la longueur d'étagère occupée (à l'épaisseur de chaque boîtier),
+  la répartition par plateforme, état et région, la part de boîtes complètes
+  et d'ISO. Chaque ligne du bilan affiche les jeux concernés.
+- **Saisie en chaîne** : **Enregistrer et suivant** garde le formulaire
+  ouvert, conserve plateforme, région et état, vide le reste. Le formulaire
+  signale un jeu déjà présent — même titre, ou même code-barres.
 - **Import / export** CSV et JSON, plus une sauvegarde complète de la base.
-  L'export suit les filtres affichés : sortir la liste des jeux auxquels il
-  manque la notice revient à filtrer, puis exporter.
-- **Suppression annulable** : une fiche supprimée par erreur se récupère
-  depuis la notification, pendant neuf secondes.
-- **Installable sur le téléphone** : ajoutée à l'écran d'accueil, l'application
-  s'ouvre en plein écran, avec un raccourci direct vers le scanner.
-- **Thème sombre / clair**, interface responsive, utilisable au clavier.
+  L'export suit les filtres affichés.
+- **Suppression annulable** depuis la notification, pendant neuf secondes.
+- **Rien ne bouge sous le doigt** : pas de zoom au toucher d'un champ sur
+  iPhone, pas de saut de mise en page pendant la recherche, pas d'effet de
+  pression sur les boutons. Le bouton retour du téléphone ferme la fenêtre
+  ouverte au lieu de quitter l'application.
+- **Installable sur le téléphone**, avec des raccourcis vers le scanner et
+  l'ajout. Avec le certificat installé (voir plus bas), l'application s'ouvre
+  même sans réseau.
+- **Thème sombre, clair ou celui du système**, interface responsive,
+  utilisable au clavier.
 
 ### États disponibles
 
@@ -61,7 +81,7 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 
 ### Raccourcis clavier
 
-`Ctrl+K` ou `/` recherche · `s` scanner · `n` nouveau jeu · `Échap` fermer / vider
+`Ctrl+K` ou `/` recherche · `s` scanner · `n` nouveau jeu · `Entrée` ferme le clavier du téléphone · `Échap` vide la recherche ou ferme la fenêtre
 
 ---
 
@@ -169,6 +189,20 @@ le plus simple est de le récupérer depuis le téléphone lui-même :
 
 La même route sert sur Android, où l'étape 3 se trouve dans
 *Sécurité → Chiffrement → Installer un certificat → Certificat CA*.
+
+### En magasin, sans réseau
+
+Loin du Wi-Fi de la maison, le serveur ne répond plus. L'application garde
+donc une copie de la collection dans le navigateur du téléphone, mise à jour à
+chaque ouverture : la recherche, les fiches et le scan continuent de répondre
+à partir de cette copie. Les modifications, elles, attendent le retour du
+réseau — l'en-tête de la liste signale alors « Copie locale ».
+
+Pour que l'application **s'ouvre** elle-même sans réseau (et pas seulement
+reste ouverte), le navigateur doit accepter son service worker, ce qu'il ne
+fait qu'avec un certificat reconnu : installez le certificat du serveur sur le
+téléphone, comme décrit ci-dessus. Sans lui, gardez simplement l'onglet ouvert
+avant de partir.
 
 ### Compatibilité
 
@@ -380,6 +414,11 @@ src/            serveur Express, accès SQLite, routes
   uploads.js    entretien des jaquettes orphelines
   routes/       jeux, import-export, recherche externe
 public/         interface (HTML, CSS, JS natif — aucun build)
+  js/data.js    la collection en mémoire : recherche, filtres, tri, copie locale
+  js/views.js   jaquettes, étagère, liste, frise, panneau de filtres
+  js/platforms.js  couleurs et dimensions des boîtiers par plateforme
+  js/detail.js, editor.js, scanner.js, stats.js, menu.js  les fenêtres
+  sw.js         service worker : ouverture hors ligne
 deploy/         install.sh, update.sh, unité systemd
 scripts/        sauvegarde, test de bout en bout, smoke-test
 ```

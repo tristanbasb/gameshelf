@@ -205,10 +205,17 @@ check "GET /js/barcode.js"            "$(status "$BASE_URL/js/barcode.js")"     
 check "GET /js/scan-worker.js"        "$(status "$BASE_URL/js/scan-worker.js")"        "200"
 check "GET /js/vendor/zxing.min.js"   "$(status "$BASE_URL/js/vendor/zxing.min.js")"   "200"
 
-# Installation sur l'ecran d'accueil d'un telephone.
+# Modules de l'interface : la collection en memoire et son rendu.
+check "GET /js/data.js"   "$(status "$BASE_URL/js/data.js")"   "200"
+check "GET /js/views.js"  "$(status "$BASE_URL/js/views.js")"  "200"
+check "GET /js/theme.js"  "$(status "$BASE_URL/js/theme.js")"  "200"
+
+# Installation sur l'ecran d'accueil d'un telephone, et ouverture hors ligne.
 check "GET /manifest.webmanifest" "$(status "$BASE_URL/manifest.webmanifest")" "200"
 check "GET /img/icon-192.png"     "$(status "$BASE_URL/img/icon-192.png")"     "200"
 check "GET /img/icon-180.png"     "$(status "$BASE_URL/img/icon-180.png")"     "200"
+check "GET /img/icon-512.png"     "$(status "$BASE_URL/img/icon-512.png")"     "200"
+check "GET /sw.js"                "$(status "$BASE_URL/sw.js")"                "200"
 
 # Certificat telechargeable, pour l'installer sur un telephone.
 if [[ "$BASE_URL" == https://* ]]; then
