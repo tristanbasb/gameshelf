@@ -50,6 +50,8 @@ fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true });
 // le durcissement systemd en place.
 fs.mkdirSync(path.join(dataDir, 'backups'), { recursive: true });
 fs.mkdirSync(path.join(dataDir, 'tmp'), { recursive: true });
+// Miniatures des jaquettes : un cache, refait a la demande s'il disparait.
+fs.mkdirSync(path.join(dataDir, 'thumbs'), { recursive: true });
 
 /**
  * Adresses IPv4 locales, utilisees pour le certificat et les URL affichees.
@@ -87,6 +89,7 @@ export const config = {
   uploadsDir: path.join(dataDir, 'uploads'),
   backupsDir: path.join(dataDir, 'backups'),
   tmpDir: path.join(dataDir, 'tmp'),
+  thumbsDir: path.join(dataDir, 'thumbs'),
   dbFile: path.join(dataDir, 'gameshelf.db'),
 
   // HTTPS auto-signe : indispensable pour que la camera du telephone
@@ -95,6 +98,9 @@ export const config = {
   tlsDir: path.join(dataDir, 'tls'),
 
   rawgApiKey: (process.env.RAWG_API_KEY || '').trim(),
+  // Identification d'un jeu par Claude (voir identification.js). Sans cle,
+  // la fonction n'apparait pas.
+  anthropicApiKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
   maxUploadBytes: int(process.env.MAX_UPLOAD_MB, 5) * 1024 * 1024,
   nodeEnv: process.env.NODE_ENV || 'production',
 };

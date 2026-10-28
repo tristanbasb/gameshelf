@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/server.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9"
   },
   "scripts": {
     "start": "node src/server.js",
@@ -15,9 +15,12 @@
     "backup": "node scripts/backup.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "better-sqlite3": "^13.0.3",
+    "compression": "^1.8.2",
     "express": "^5.2.1",
-    "multer": "^2.0.1"
+    "multer": "^2.0.1",
+    "sharp": "^0.35.5"
   },
   "license": "MIT",
   "private": true,

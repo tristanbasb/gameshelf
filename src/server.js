@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
@@ -10,9 +11,11 @@ import { loadOrCreateCertificate, CERT_FILE } from './tls.js';
 import { ValidationError } from './games.js';
 import { limite } from './limite.js';
 import { demarrerEntretien } from './uploads.js';
+import { miniatureExistante, fabriquerMiniature } from './miniatures.js';
 import gamesRoutes from './routes/games.routes.js';
 import dataRoutes from './routes/data.routes.js';
 import externalRoutes from './routes/external.routes.js';
+import identificationRoutes from './routes/identification.routes.js';
 
 const publicDir = path.join(config.root, 'public');
 const app = express();
@@ -44,6 +47,17 @@ app.use((_req, res, next) => {
   );
   next();
 });
+
+/* --------------------------------------------------------------------------
+ * Compression
+ *
+ * L'interface relit la collection entiere a chaque ouverture : 1 500 jeux
+ * pesent 520 Ko de JSON, 40 Ko une fois compresses. Sur le Wi-Fi d'un
+ * telephone, c'est la difference entre une liste qui arrive et une liste qui
+ * se fait attendre. Les scripts et la feuille de style passent de 220 a
+ * 70 Ko. Les images, deja compressees, sont laissees telles quelles.
+ * ----------------------------------------------------------------------- */
+app.use(compression());
 
 /* --------------------------------------------------------------------------
  * Requetes venues d'un autre site
@@ -113,6 +127,24 @@ app.use(
     index: false,
     dotfiles: 'ignore',
   }),
+);
+
+/*
+ * Miniatures des jaquettes (voir miniatures.js). Hors de /api : une grille
+ * en demande des centaines d'un coup, sans rapport avec le debit de l'API.
+ * Seule la fabrication — un telechargement et une reduction — est plafonnee ;
+ * servir une miniature deja faite ne coute qu'une lecture de fichier.
+ */
+app.get(
+  '/thumbs',
+  miniatureExistante,
+  limite({
+    nom: 'miniatures',
+    max: 600,
+    secondes: 600,
+    message: 'Trop de miniatures a fabriquer d affilee, patientez quelques minutes',
+  }),
+  fabriquerMiniature,
 );
 
 app.get('/healthz', (_req, res) => {
@@ -258,6 +290,7 @@ app.get('/api/config', (req, res) => {
   res.json({
     version: appVersion,
     externalSearch: Boolean(config.rawgApiKey),
+    identify: Boolean(config.anthropicApiKey),
     // L'interface previent l'utilisateur quand la camera sera refusee.
     secure: req.secure || req.hostname === 'localhost',
   });
@@ -306,10 +339,19 @@ app.use('/api/backup', limite({
   secondes: 600,
   message: 'Trop de sauvegardes d affilee, patientez quelques minutes',
 }));
+// Chaque identification est facturee sur le compte Anthropic : un plafond
+// large pour une soiree de catalogage, mais pas pour une boucle qui s'emballe.
+app.use('/api/identify', limite({
+  nom: 'identification',
+  max: 40,
+  secondes: 600,
+  message: 'Trop d identifications d affilee, patientez quelques minutes',
+}));
 
 app.use('/api', gamesRoutes);
 app.use('/api', dataRoutes);
 app.use('/api', externalRoutes);
+app.use('/api', identificationRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Route inconnue' });
@@ -377,7 +419,7 @@ server.listen(config.port, config.host, () => {
   console.log('');
   console.log(`  Donnees : ${config.dataDir}`);
 
-  // Jaquettes orphelines : au demarrage, puis une fois par heure.
+  // Jaquettes et miniatures orphelines : au demarrage, puis une fois par heure.
   demarrerEntretien();
 
   if (credentials) {

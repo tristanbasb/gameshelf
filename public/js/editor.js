@@ -35,6 +35,10 @@ function formMarkup(game, values) {
       <button type="button" class="icon-btn" data-close aria-label="Fermer">${icon('close')}</button>
     </div>
     <div class="sheet-body">
+      ${!game && actions.instance.identify ? `<div class="id-launch">
+        <button type="button" class="btn btn--block" data-identify>${icon('camera')}Photographier le jeu</button>
+        <span class="hint">Face avant, dos ou disque : Claude reconnaît le jeu et propose la fiche, que vous validez avant qu’elle ne soit remplie.</span>
+      </div>` : ''}
       <div class="form-grid">
         <div class="field field--full">
           <label for="f-title">Titre</label>
@@ -309,6 +313,26 @@ export function openEditor(game = null, prefill = {}, { from = null } = {}) {
     }
     if (t.closest('[data-lookup]')) {
       runLookup(sheet, form, updatePreview);
+      return;
+    }
+    if (t.closest('[data-identify]')) {
+      actions.openIdentify({
+        ean: field('ean').value.replace(/[\s-]/g, ''),
+        serial: field('serial').value.trim(),
+        capture: true,
+        onConfirm: (proposed, identifySheet) => {
+          // La fiche validee l'emporte, y compris sur la plateforme et la
+          // region reprises de la saisie precedente.
+          for (const [name, value] of Object.entries(proposed)) {
+            if (field(name)) field(name).value = value;
+          }
+          paintPills('platform');
+          paintPills('region');
+          checkDupes();
+          identifySheet.close();
+          toast('Fiche remplie : vérifiez-la, puis enregistrez.');
+        },
+      });
       return;
     }
     if (t.closest('[data-delete]')) {

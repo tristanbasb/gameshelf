@@ -34,17 +34,34 @@ function caseSize(format) {
 const brokenImages = new Set();
 
 /**
+ * Miniature d'une jaquette, reduite et servie par le serveur : quelques
+ * dizaines de kilo-octets au lieu d'une image de 1600 pixels, et une adresse
+ * de la meme origine, que le service worker garde pour le magasin.
+ */
+export const thumbUrl = (cover) => `/thumbs?src=${encodeURIComponent(cover)}`;
+
+/**
+ * Attributs d'une jaquette : la miniature d'abord, l'image d'origine en
+ * secours — le serveur n'a pas toujours pu la reduire. La fiche fait
+ * l'inverse : l'image d'origine, et la miniature si elle est hors de portee.
+ */
+export function coverAttrs(cover, { original = false } = {}) {
+  const [src, fallback] = original ? [cover, thumbUrl(cover)] : [thumbUrl(cover), cover];
+  return `src="${esc(src)}" data-fallback="${esc(fallback)}" referrerpolicy="no-referrer"`;
+}
+
+/**
  * Le boitier d'un jeu : sa jaquette, ou, faute d'image, une face fabriquee
  * aux couleurs de la plateforme — bandeau, titre, serial.
  */
-export function caseMarkup(game, { sized = true, eager = false, extra = '' } = {}) {
+export function caseMarkup(game, { sized = true, eager = false, original = false, extra = '' } = {}) {
   const p = plateforme(game.platform);
   const size = sized ? caseSize(p.format) : `--fmt:${p.format}`;
   const band = [p.court !== '—' ? p.court : '', game.region].filter(Boolean).join(' · ');
   if (game.cover_url && !brokenImages.has(game.cover_url)) {
     return `<span class="case" style="${size};${spineVars(p)}" data-band="${esc(band)}">
-      <img src="${esc(game.cover_url)}" alt="" ${eager ? '' : 'loading="lazy"'} decoding="async"
-        referrerpolicy="no-referrer" draggable="false">${extra}</span>`;
+      <img ${coverAttrs(game.cover_url, { original })} alt="" ${eager ? '' : 'loading="lazy"'} decoding="async"
+        draggable="false">${extra}</span>`;
   }
   return `<span class="case case--made" style="${size};${spineVars(p)}" data-band="${esc(band)}">
     <span class="made-title">${esc(game.title)}</span>
@@ -52,12 +69,19 @@ export function caseMarkup(game, { sized = true, eager = false, extra = '' } = {
 }
 
 /**
- * Remplace une image cassee par la face fabriquee. L'evenement `error` ne
- * remonte pas : il est ecoute en capture, sur le conteneur.
+ * Remplace une image cassee par sa source de secours, puis, faute de mieux,
+ * par la face fabriquee. L'evenement `error` ne remonte pas : il est ecoute
+ * en capture, sur le conteneur.
  */
 export function handleBrokenImage(event) {
   const img = event.target;
   if (!(img instanceof HTMLImageElement)) return;
+  const fallback = img.dataset.fallback;
+  if (fallback) {
+    delete img.dataset.fallback;
+    img.src = fallback;
+    return;
+  }
   const box = img.closest('.case');
   const host = img.closest('[data-id]');
   if (!box || !host) {
@@ -131,7 +155,7 @@ function buildRow(game) {
   el.className = 'row';
   el.dataset.id = game.id;
   const thumb = game.cover_url && !brokenImages.has(game.cover_url)
-    ? `<img src="${esc(game.cover_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+    ? `<img ${coverAttrs(game.cover_url)} alt="" loading="lazy" decoding="async">`
     : '';
   el.innerHTML = `
     <span class="row-thumb" style="${spineVars(p)}">${thumb}</span>
@@ -164,7 +188,10 @@ function buildSpine(game) {
   return el;
 }
 
-const metres = (mm) => `${(mm / 1000).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
+// Fabrique une fois : `toLocaleString` avec des options en refait un a chaque
+// appel, et le compteur comme chaque etagere en demandent un par affichage.
+const fmtMetres = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const metres = (mm) => `${fmtMetres.format(mm / 1000)} m`;
 
 /** Longueur d'etagere occupee, en millimetres. */
 export const shelfLength = (games) => games.reduce((sum, g) => sum + plateforme(g.platform).epaisseur, 0);
@@ -334,14 +361,31 @@ export function createStrip(stripEl, bubbleEl, { onOpen }) {
 
   function build() {
     const games = allGames().sort(shelfOrder);
+    // Une tranche ne depend que du rang du jeu et de sa plateforme. Changer
+    // l'etat ou le favori d'une fiche — le geste le plus courant — laisse la
+    // frise telle quelle : inutile de refaire un element par jeu.
+    const same = games.length === slices.length && games.every((game, i) =>
+      slices[i].id === game.id && slices[i].platform === game.platform);
+    if (same) return;
     slices = games.map((game) => {
       const el = document.createElement('i');
       const p = plateforme(game.platform);
       el.style.cssText = `--t:${p.epaisseur};--c:${p.trait}`;
-      return { id: game.id, el };
+      return { id: game.id, platform: game.platform, el };
     });
     byId = new Map(slices.map((s) => [s.id, s]));
     stripEl.replaceChildren(...slices.map((s) => s.el));
+    fit();
+  }
+
+  /*
+   * Un pixel d'ecart separe les tranches tant qu'elles sont larges. Passe un
+   * jeu pour trois pixels, les ecarts prendraient toute la place — 1 500 jeux
+   * sur 950 pixels, c'est 1 499 pixels d'ecart — et la frise disparaitrait :
+   * les tranches se touchent alors, une sur deux plus sombre.
+   */
+  function fit() {
+    stripEl.classList.toggle('is-dense', slices.length * 3 > stripEl.clientWidth);
   }
 
   function update(test, filtering) {
@@ -384,7 +428,7 @@ export function createStrip(stripEl, bubbleEl, { onOpen }) {
     if (!game) return;
     const p = plateforme(game.platform);
     bubbleEl.innerHTML = `${game.cover_url && !brokenImages.has(game.cover_url)
-      ? `<img src="${esc(game.cover_url)}" alt="" referrerpolicy="no-referrer">`
+      ? `<img ${coverAttrs(game.cover_url)} alt="">`
       : `<span class="bubble-swatch" style="background:${p.trait}"></span>`}
       <div><strong>${esc(game.title)}</strong><span>${esc(platformLine(game))}</span></div>`;
     bubbleEl.hidden = false;
@@ -398,7 +442,7 @@ export function createStrip(stripEl, bubbleEl, { onOpen }) {
     show(null);
   }
 
-  bubbleEl.addEventListener('error', (event) => event.target.remove?.(), true);
+  bubbleEl.addEventListener('error', handleBrokenImage, true);
   stripEl.addEventListener('pointerenter', measure);
   stripEl.addEventListener('pointermove', (event) => {
     if (!bounds) measure();
@@ -442,6 +486,7 @@ export function createStrip(stripEl, bubbleEl, { onOpen }) {
   });
   window.addEventListener('resize', () => {
     bounds = null;
+    fit();
   });
 
   return { build, update, has: (id) => byId.has(id) };

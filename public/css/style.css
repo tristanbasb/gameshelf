@@ -1,8 +1,9 @@
 /* ==========================================================================
    GameVault — feuille de style
 
-   Deux matieres pour les deux themes :
+   Une matiere par theme :
    - sombre, l'encre bleu nuit de la face gravee d'un disque de PS2 ;
+   - noir, la face noire des disques de la premiere PlayStation ;
    - clair, le papier d'une notice.
    Une seule couleur d'action : le jaune des etiquettes de prix collees sur
    les boitiers d'occasion. Le reste de la couleur vient des jeux eux-memes —
@@ -92,6 +93,54 @@
   --plank: #c9d0e3;
   --plank-edge: #b3bcd6;
   --backdrop: rgba(11, 16, 36, 0.42);
+}
+
+/*
+ * Noir : le sombre sans sa teinte bleue. Le fond est un noir pur — sur un
+ * ecran OLED, ses pixels sont eteints — et les surfaces des gris neutres, pour
+ * que seules les jaquettes et les tranches portent de la couleur. Les signaux
+ * (etiquette, etats, alertes) sont ceux du theme sombre.
+ */
+[data-theme="black"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --bg-2: #0a0a0c;
+  --surface: #111114;
+  --surface-2: #1a1a1e;
+  --press: #26262b;
+  --line: #222226;
+  --line-2: #34343a;
+  --text: #f2f2f5;
+  --text-2: #a8a8b3;
+  --text-3: #76767f;
+
+  --sticker: #ffc83d;
+  --sticker-hover: #ffd45f;
+  --sticker-press: #f0b524;
+  --sticker-ink: #1d1500;
+  --focus: #ffc83d;
+  --mark: rgba(255, 200, 61, 0.3);
+
+  --ok: #3ddc97;
+  --ok-soft: rgba(61, 220, 151, 0.12);
+  --warn: #ffa94d;
+  --danger: #ff6b81;
+  --danger-soft: rgba(255, 107, 129, 0.12);
+
+  --c-sealed: #7dd3fc;
+  --c-mint: #3ddc97;
+  --c-good: #b6e35a;
+  --c-fair: #ffa94d;
+  --c-poor: #ff6b81;
+  --c-none: #5e5e68;
+
+  /* Sur un fond noir, une ombre ne se voit plus : un filet detache les
+     boitiers sombres — PS2, Xbox — du fond. */
+  --case-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 14px 26px -16px rgba(0, 0, 0, 0.9);
+  --cabinet: #141417;
+  --plank: #2b2b31;
+  --plank-edge: #3d3d45;
+  --backdrop: rgba(0, 0, 0, 0.78);
 }
 
 :root {
@@ -569,6 +618,9 @@ mark {
   background: var(--c);
   transition: opacity 0.14s;
 }
+/* Plus de jeux que la frise n'a de place pour les espacer (voir createStrip). */
+.strip.is-dense { gap: 0; }
+.strip.is-dense > i:nth-child(odd) { filter: brightness(0.82); }
 .strip.is-filtering > i:not(.on) { opacity: 0.13; }
 .strip > i.is-current { background: var(--sticker) !important; opacity: 1 !important; }
 
@@ -1374,7 +1426,7 @@ mark {
 .menu-item .i { flex: none; color: var(--text-2); }
 .menu-item strong { display: block; font-weight: 600; }
 .menu-item span { display: block; color: var(--text-2); font-size: 13.5px; }
-.theme-choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.theme-choice { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .theme-choice button {
   display: flex;
   flex-direction: column;
@@ -1722,6 +1774,101 @@ mark {
 .recent-scans .mono { color: var(--text-2); }
 .recent-scans .yes { color: var(--ok); font-weight: 600; }
 .recent-scans .no { color: var(--text-3); }
+
+/* --------------------------------------------------------------------------
+   Identification par Claude
+   -------------------------------------------------------------------------- */
+
+.sheet--identify { width: min(94vw, 540px); }
+.id-block { margin-top: 18px; }
+.verdict-body + .id-block, .verdict + .id-block { margin-top: 16px; }
+
+.id-launch { display: grid; gap: 6px; margin-bottom: 22px; }
+
+.id-photo {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 120px;
+  margin-top: 16px;
+  border: 1px dashed var(--line-2);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+.id-photo img { display: block; width: 100%; max-height: 260px; object-fit: contain; background: var(--bg-2); }
+.id-take { margin-top: 10px; }
+
+.id-wait { display: grid; justify-items: center; gap: 12px; padding: 28px 0 12px; text-align: center; }
+.id-wait img { width: 120px; height: 120px; border-radius: 10px; object-fit: cover; }
+/* Une barre qui avance : l'attente est longue, elle doit se voir vivante. */
+.id-bar {
+  position: relative;
+  width: 160px;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--line);
+}
+.id-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--sticker);
+  animation: id-slide 1.3s ease-in-out infinite;
+}
+@keyframes id-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) {
+  .id-bar::after { width: 100%; opacity: 0.5; animation: none; }
+}
+
+.verdict--confirmed { border-color: color-mix(in srgb, var(--ok) 55%, var(--line-2)); }
+.verdict--confirmed .verdict-head { background: var(--ok-soft); }
+.verdict--confirmed .verdict-mark { background: var(--ok); color: #04150d; }
+.verdict--likely { border-color: color-mix(in srgb, var(--warn) 45%, var(--line-2)); }
+.verdict--likely .verdict-head { background: color-mix(in srgb, var(--warn) 11%, transparent); }
+.verdict--likely .verdict-mark { background: var(--warn); color: #1e1000; }
+.verdict--uncertain { border-color: color-mix(in srgb, var(--danger) 50%, var(--line-2)); }
+.verdict--uncertain .verdict-head { background: var(--danger-soft); }
+.verdict--uncertain .verdict-mark { background: var(--danger); color: #fff; }
+.verdict--not_found .verdict-head { background: var(--surface-2); }
+.verdict--not_found .verdict-mark { background: var(--surface); color: var(--text-2); }
+.id-summary { margin-top: 5px; color: var(--text-2); font-size: 14px; line-height: 1.45; }
+
+.id-fields { display: grid; gap: 8px; margin: 0; padding: 4px 6px; }
+.id-fields > div { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.id-fields dt { color: var(--text-3); font-size: 13px; }
+.id-fields dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+
+.id-checks { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.id-checks li { display: flex; align-items: flex-start; gap: 9px; font-size: 14px; line-height: 1.4; }
+.id-checks .i { flex: none; margin-top: 1px; }
+.id-checks .is-ok .i { color: var(--ok); }
+.id-checks .is-ko { color: var(--danger); }
+.id-checks .is-na { color: var(--text-2); }
+.id-checks .is-na .i { color: var(--text-3); }
+
+.id-doubts { display: grid; gap: 5px; margin: 0; padding-left: 18px; color: var(--text-2); font-size: 14px; }
+
+.id-sources { display: grid; gap: 6px; }
+.id-source {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: inherit;
+  font-size: 13.5px;
+  text-decoration: none;
+}
+.id-source:hover { border-color: var(--line-2); background: var(--surface-2); }
+.id-source strong { min-width: 0; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.id-source span { flex: none; color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
 
 /* --------------------------------------------------------------------------
    Bilan

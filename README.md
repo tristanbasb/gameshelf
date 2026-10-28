@@ -25,6 +25,11 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
   collection » avec l'ajout pré-rempli. La réponse vient de la copie de la
   collection gardée sur le téléphone : elle fonctionne **aussi en magasin,
   loin du Wi-Fi de la maison**.
+- **Identification par Claude** *(optionnelle, avec une clé Anthropic)* : une
+  photo du boîtier, le code-barres et, s'il est connu, le serial suffisent —
+  Claude retrouve le jeu, le serveur vérifie la proposition, et vous validez
+  la fiche avant qu'elle ne remplisse le formulaire. Voir
+  [Identifier un jeu avec Claude](#identifier-un-jeu-avec-claude).
 - **Recherche instantanée**, sans aller-retour avec le serveur : le titre, la
   plateforme, la région, le serial, les tags, les notes et le code-barres.
   Insensible aux accents et à la casse — « asterix » trouve « Astérix » —, les
@@ -65,7 +70,8 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 - **Installable sur le téléphone**, avec des raccourcis vers le scanner et
   l'ajout. Avec le certificat installé (voir plus bas), l'application s'ouvre
   même sans réseau.
-- **Thème sombre, clair ou celui du système**, interface responsive,
+- **Thème sombre, noir, clair ou celui du système** — le noir, sans teinte
+  bleue, éteint le fond sur les écrans OLED —, interface responsive,
   utilisable au clavier.
 
 ### États disponibles
@@ -204,6 +210,10 @@ fait qu'avec un certificat reconnu : installez le certificat du serveur sur le
 téléphone, comme décrit ci-dessus. Sans lui, gardez simplement l'onglet ouvert
 avant de partir.
 
+Les jaquettes suivent : le service worker garde la
+[miniature](#miniatures-des-jaquettes) de chaque jeu de la collection, et le
+jeu scanné en rayon s'affiche avec la sienne.
+
 ### Compatibilité
 
 La lecture fonctionne sur tous les navigateurs, par deux chemins :
@@ -238,6 +248,129 @@ n'est pas dans l'image. L'application agit donc sur la prise de vue :
 
 ---
 
+## Miniatures des jaquettes
+
+Les jaquettes viennent le plus souvent d'autres sites — Amazon, eBay,
+PriceCharting, des boutiques — et en grand format, souvent 1300 à 1600 pixels
+de large. Sur un téléphone, la grille en décoderait des centaines pour les
+afficher sur une centaine de points chacune. Et hors ligne, aucune ne
+s'afficherait : le navigateur ne laisse pas l'application garder une image
+venue d'un autre site.
+
+Le serveur fabrique donc des **miniatures**. À la première demande, il
+télécharge l'image une fois, la réduit pour couvrir 360 × 480 pixels — trois
+pixels physiques par point sur la grille d'un téléphone —, la convertit en WebP
+et la garde dans `data/thumbs/`. Sur une collection de 240 jeux, les jaquettes
+passent de 30 Mo à 6 Mo, de 160 Ko à 32 Ko en moyenne, et surtout d'images de
+1600 pixels à décoder à des images à la taille de l'écran.
+
+- La grille, la liste, la frise, le bilan et le scan affichent la miniature ;
+  la fiche d'un jeu garde l'image d'origine, en grand.
+- Le service worker garde les miniatures de **toute** la collection, pas
+  seulement celles qui ont défilé à l'écran : en magasin, le jeu scanné
+  retrouve sa jaquette. Cela suppose le certificat installé (voir
+  [En magasin, sans réseau](#en-magasin-sans-réseau)).
+- Si une miniature ne peut pas être fabriquée, l'interface affiche l'image
+  d'origine, comme avant ; et si l'image d'origine est hors de portée, la fiche
+  se rabat sur la miniature. Certains hébergeurs refusent les téléchargements
+  qui ne viennent pas d'un navigateur — c'est le cas de gamecash.fr : leurs
+  jaquettes restent en taille d'origine, et ne s'affichent pas hors ligne.
+  L'échec est noté dans le journal du service, et n'est retenté qu'au bout
+  d'une demi-heure.
+- Les miniatures qu'aucune fiche n'utilise plus sont supprimées avec les
+  jaquettes orphelines, une fois par heure. Le dossier peut être vidé sans
+  risque : il se reconstitue à la demande.
+
+**Garde-fous.** Faire télécharger une adresse au serveur, c'est lui prêter sa
+place sur le réseau local. La route ne télécharge donc que des images déjà
+utilisées par une fiche ; elle refuse les adresses du réseau local, de la
+machine elle-même et les plages réservées — vérifiées à chaque redirection, et
+au moment même de la connexion ; elle abandonne au-delà de 10 secondes ou de
+8 Mo ; elle vérifie que le contenu est une image d'après ses premiers octets,
+et non d'après le type annoncé ; et elle plafonne ses dimensions avant de la
+décoder.
+
+**Dépendance.** La réduction passe par [sharp](https://sharp.pixelplumbing.com/),
+dont les binaires sont précompilés pour Windows, macOS et Linux (x64 et ARM) :
+`npm install` suffit, sans Visual Studio ni outils de compilation. Sur une
+plateforme qu'elle ne couvre pas, le serveur démarre quand même, le signale
+dans son journal, et la grille affiche les images d'origine.
+
+---
+
+## Identifier un jeu avec Claude
+
+Devant un jeu qui n'est pas encore dans la collection, le plus long est de
+retrouver son titre exact, sa plateforme, sa région et son serial. Avec une clé
+Anthropic dans `.env` (`ANTHROPIC_API_KEY`), Claude s'en charge.
+
+**Le geste.** Une photo du jeu suffit — face avant, dos, tranche, disque ou
+cartouche : Claude lit ce qu'elle montre. Trois entrées :
+
+- dans **Ajouter**, en haut du formulaire : **Photographier le jeu** ouvre
+  l'appareil photo, et l'identification part dès la photo prise ;
+- dans le scanner, quand une photo ne porte pas de code-barres :
+  **Reconnaître le jeu avec Claude**, qui part aussitôt ;
+- dans le scanner, quand la réponse est « pas dans votre collection » :
+  **Identifier avec Claude**, avec la photo et le code qui viennent d'être lus.
+  La fenêtre propose alors d'ajouter le serial avant de lancer.
+
+**Avec ou sans code-barres.** Photographier le dos donne le plus de chances :
+le code-barres, lu sur le téléphone, désigne une édition précise — région,
+réédition Platinum ou Player's Choice —, et le titre, la plateforme et la
+mention PEGI ou ESRB y figurent aussi. Une face avant suffit à reconnaître le
+jeu, mais pas son édition : le verdict s'arrête alors à « Probablement ce
+jeu », et l'écran rappelle que l'édition reste à vérifier. Un code-barres
+trouvé seulement en ligne n'entre jamais dans la fiche — il peut être celui
+d'une autre édition, et le scan répondrait ensuite à côté.
+
+**Ce que fait Claude.** Il lit la photo, cherche le code-barres sur le web
+(bases de codes-barres, fiches de vente, sites de collectionneurs) et recoupe
+le tout. Il rend ce qu'il a lu sur la photo, la fiche qu'il propose, ses
+sources et ses doutes.
+
+**Ce que vérifie le serveur.** La proposition n'est pas prise pour argent
+comptant. Le serveur vérifie lui-même :
+
+- la clé de contrôle du code-barres ;
+- l'accord entre le code-barres fourni, celui que Claude lit sur la photo et
+  celui de la fiche trouvée — de même pour le serial et la région ;
+- les sources : seules comptent les pages que la recherche a réellement
+  renvoyées. Une adresse citée sans en provenir est écartée.
+
+Le verdict en découle :
+
+| Verdict | Condition |
+|---|---|
+| **Jeu confirmé** | une source relie ce code-barres à ce titre, et rien ne le contredit |
+| **Probablement ce jeu** | rien ne le contredit, mais seul le titre — lu sur la photo, ou confirmé en ligne — l'appuie, sans le code-barres de l'exemplaire |
+| **Identification incertaine** | une vérification contredit la fiche, ou aucun indice ne l'appuie |
+| **Jeu non identifié** | Claude n'a pas trouvé |
+
+**La validation.** L'écran montre la fiche proposée, chaque vérification
+(concordante, contradictoire ou impossible), les doutes, les sources, et le
+jeu de la collection qui lui ressemble s'il y en a un. Rien n'est rempli avant
+**C'est bien ce jeu** — **Remplir quand même** pour un verdict incertain. Le
+formulaire qui suit reste modifiable et s'enregistre à la main.
+**Ce n'est pas ce jeu** ramène à la photo : reprenez-la de plus près, ou
+ajoutez le serial pour départager deux éditions.
+
+**Ce qui sort de la maison.** La photo (réduite à 2000 pixels), le code-barres,
+le serial et la liste des plateformes de la collection partent chez Anthropic.
+La photo n'est conservée ni sur le serveur ni dans la collection. Le serveur
+doit avoir accès à Internet ; en magasin, sans réseau, le scan fonctionne
+comme avant, mais pas l'identification.
+
+**Le coût.** Chaque identification est facturée sur le compte de la clé :
+de l'ordre de 10 à 15 centimes selon le nombre de recherches (Claude Opus 5.5,
+cinq recherches au plus). Le journal du service note, pour chacune, les jetons
+lus et écrits et le nombre de recherches. Un plafond de 40 identifications par
+tranche de dix minutes protège d'une boucle qui s'emballerait. Si le modèle
+décline une demande, l'API la rejoue d'elle-même sur le modèle de repli
+qu'Anthropic recommande.
+
+---
+
 ## Configuration
 
 Tout est optionnel : les valeurs par défaut conviennent à une installation
@@ -250,6 +383,7 @@ locale. Voir [`.env.example`](.env.example).
 | `DATA_DIR` | `./data` | Base SQLite, images et certificat |
 | `ENABLE_HTTPS` | `1` | HTTPS local auto-signé. `0` = HTTP simple, sans scan par caméra |
 | `RAWG_API_KEY` | *(vide)* | Active le pré-remplissage en ligne ([rawg.io/apidocs](https://rawg.io/apidocs)) |
+| `ANTHROPIC_API_KEY` | *(vide)* | Active l'[identification par Claude](#identifier-un-jeu-avec-claude) ([console.anthropic.com](https://console.anthropic.com)) |
 | `MAX_UPLOAD_MB` | `5` | Taille maximale d'une image |
 
 > **Aucune authentification** : toute personne ayant accès au réseau local peut
@@ -315,7 +449,8 @@ export → import restitue la collection à l'identique.
 ## Sauvegardes
 
 Les données tiennent dans `data/` : la base `gameshelf.db`, le dossier
-`uploads/`, le certificat `tls/` et les sauvegardes `backups/`.
+`uploads/`, le certificat `tls/` et les sauvegardes `backups/`. Le dossier
+`thumbs/` n'est qu'un cache de miniatures, inutile à sauvegarder.
 
 Un import en mode **Remplacer** prend de lui-même une copie de la base juste
 avant d'effacer quoi que ce soit : elle est écrite dans `data/backups/` sous
@@ -367,8 +502,8 @@ Pour tester une instance déjà en service — le serveur, par exemple :
 Le script teste l'ensemble des routes (lecture, création, modification, scan
 par code-barres, filtre des incomplets, validation des entrées, import, export,
 sauvegarde, pages statiques, refus des écritures venues d'un autre site,
-vérification du contenu des images) et supprime les données de test qu'il a
-créées.
+vérification du contenu des images, fabrication des miniatures et refus des
+adresses locales) et supprime les données de test qu'il a créées.
 
 ---
 
@@ -390,7 +525,9 @@ créées.
 | `POST` | `/api/import` | Import (`{content, format, mode}`) |
 | `GET` | `/api/backup` | Copie de la base SQLite |
 | `POST` | `/api/upload` | Téléversement d'une image (`multipart`, champ `cover`) |
+| `GET` | `/thumbs?src=` | Miniature WebP d'une jaquette utilisée par une fiche |
 | `GET` | `/api/external/search?q=` | Recherche RAWG (si clé configurée) |
+| `POST` | `/api/identify` | Identification par Claude (`multipart` : `photo`, `ean`, `ean_source`, `serial`) — propose, n'enregistre rien |
 
 Paramètres de `GET /api/games` : `search`, `ean`, `serial`, `platform`,
 `region`, `condition`, `tag`, `favorite=1`, `incomplete=1`, `iso=0|1`,
@@ -412,12 +549,14 @@ src/            serveur Express, accès SQLite, routes
   images.js     reconnaissance du type réel d'une image
   limite.js     plafonds de débit par adresse
   uploads.js    entretien des jaquettes orphelines
-  routes/       jeux, import-export, recherche externe
+  miniatures.js miniatures des jaquettes : téléchargement sûr, réduction, cache
+  identification.js  identification par Claude et vérification de la proposition
+  routes/       jeux, import-export, recherche externe, identification
 public/         interface (HTML, CSS, JS natif — aucun build)
   js/data.js    la collection en mémoire : recherche, filtres, tri, copie locale
   js/views.js   jaquettes, étagère, liste, frise, panneau de filtres
   js/platforms.js  couleurs et dimensions des boîtiers par plateforme
-  js/detail.js, editor.js, scanner.js, stats.js, menu.js  les fenêtres
+  js/detail.js, editor.js, scanner.js, identify.js, stats.js, menu.js  les fenêtres
   sw.js         service worker : ouverture hors ligne
 deploy/         install.sh, update.sh, unité systemd
 scripts/        sauvegarde, test de bout en bout, smoke-test
