@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db } from './db.js';
 import { config } from './config.js';
+import { balayerMiniatures } from './miniatures.js';
 
 /*
  * Delai de grace avant qu'un fichier puisse etre considere comme orphelin.
@@ -103,6 +104,8 @@ export function demarrerEntretien() {
   const passer = () => {
     const jaquettes = balayerJaquettes();
     if (jaquettes) console.log(`  ${jaquettes} jaquette(s) orpheline(s) supprimee(s)`);
+    const miniatures = balayerMiniatures();
+    if (miniatures) console.log(`  ${miniatures} miniature(s) orpheline(s) supprimee(s)`);
     const passages = viderFichiersDePassage();
     if (passages) console.log(`  ${passages} fichier(s) de passage supprime(s)`);
   };

@@ -5,7 +5,8 @@
  * pose le theme avant que la page ne soit peinte. Sans lui, un theme clair
  * choisi a la main s'afficherait d'abord sombre, puis basculerait.
  *
- * Trois reglages : « dark », « light », ou « auto » qui suit le systeme.
+ * Quatre reglages : « dark », « black », « light », ou « auto » qui suit le
+ * systeme — et choisit alors entre « light » et « dark ».
  */
 (() => {
   let choix = 'auto';

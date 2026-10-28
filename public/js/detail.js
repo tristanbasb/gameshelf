@@ -17,7 +17,7 @@ import {
   CONDITIONS, CONDITION_SHORT, CONDITION_LABELS, PARTS, missingParts,
 } from './data.js';
 import { plateforme } from './platforms.js';
-import { caseMarkup, condVar, spineVars, handleBrokenImage } from './views.js';
+import { caseMarkup, coverAttrs, condVar, spineVars, handleBrokenImage } from './views.js';
 import { barcodeSvg } from './ean.js';
 import { actions } from './actions.js';
 
@@ -25,10 +25,12 @@ const PART_ICONS = { has_box: 'box', has_cover_art: 'cover', has_manual: 'manual
 
 function stageMarkup(game) {
   const p = plateforme(game.platform);
+  // Le halo est flou : la miniature, deja chargee par la grille, lui suffit.
+  // Le boitier, lui, montre l'image d'origine.
   const glow = game.cover_url
-    ? `<img class="detail-glow" src="${esc(game.cover_url)}" alt="" aria-hidden="true" referrerpolicy="no-referrer">`
+    ? `<img class="detail-glow" ${coverAttrs(game.cover_url)} alt="" aria-hidden="true">`
     : '';
-  return `<div class="detail-stage" data-id="${game.id}" style="${spineVars(p)}">${glow}${caseMarkup(game, { sized: false, eager: true })}</div>`;
+  return `<div class="detail-stage" data-id="${game.id}" style="${spineVars(p)}">${glow}${caseMarkup(game, { sized: false, eager: true, original: true })}</div>`;
 }
 
 const scaleMarkup = (game) => CONDITIONS.map((c) => `

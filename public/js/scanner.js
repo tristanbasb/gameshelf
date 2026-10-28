@@ -15,7 +15,7 @@ import { api } from './api.js';
 import { esc, icon, openSheet, toast } from './ui.js';
 import { collection, findByEan, onChange, CONDITION_SHORT } from './data.js';
 import { plateforme } from './platforms.js';
-import { spineVars, partsSummary } from './views.js';
+import { spineVars, partsSummary, coverAttrs, handleBrokenImage } from './views.js';
 import { createBarcodeDetector } from './barcode.js';
 import { actions } from './actions.js';
 
@@ -31,7 +31,7 @@ const CADRAGES = [
   { part: 0.6, largeur: 2400 },
 ];
 
-async function readPhoto(file, reader) {
+export async function readPhoto(file, reader) {
   let source;
   try {
     // Sans cette option, une photo prise en portrait arrive parfois couchee.
@@ -59,7 +59,8 @@ const history = [];
 
 function hitMarkup(game) {
   const p = plateforme(game.platform);
-  const thumb = game.cover_url ? `<img src="${esc(game.cover_url)}" alt="" referrerpolicy="no-referrer">` : '';
+  // En magasin, la miniature est celle que le service worker a gardee.
+  const thumb = game.cover_url ? `<img ${coverAttrs(game.cover_url)} alt="">` : '';
   const meta = [
     [game.platform, game.region].filter(Boolean).join(' · '),
     game.condition ? CONDITION_SHORT[game.condition] : '',
@@ -89,7 +90,10 @@ function verdictMarkup(code, games) {
       <div><p class="verdict-title">Pas dans votre collection</p><p class="verdict-code">${esc(code)}</p></div>
     </div>
     <div class="verdict-body">
-      <button type="button" class="btn btn--primary btn--block" data-add="${esc(code)}">${icon('plus')}Ajouter ce jeu</button>
+      ${actions.instance.identify
+        ? `<button type="button" class="btn btn--primary btn--block" data-identify="${esc(code)}">${icon('spark')}Identifier avec Claude</button>
+           <button type="button" class="btn btn--block" data-add="${esc(code)}">${icon('plus')}Saisir à la main</button>`
+        : `<button type="button" class="btn btn--primary btn--block" data-add="${esc(code)}">${icon('plus')}Ajouter ce jeu</button>`}
     </div>
   </div>`;
 }
@@ -169,7 +173,11 @@ export function openScanner({ onCode = null } = {}) {
     return readerPromise;
   };
 
-  async function answer(raw) {
+  // Photo du dernier code lu : Claude la recoit avec le code, s'il faut
+  // identifier le jeu.
+  let lastPhoto = null;
+
+  async function answer(raw, photo = null) {
     const code = String(raw).replace(/[\s-]/g, '');
     if (!/^\d{8,14}$/.test(code)) {
       status.textContent = 'Un code-barres compte de 8 à 14 chiffres.';
@@ -196,6 +204,7 @@ export function openScanner({ onCode = null } = {}) {
     navigator.vibrate?.(games.length ? [40, 60, 40] : 60);
     status.textContent = '';
     lastCode = code;
+    lastPhoto = photo;
     verdictBox.innerHTML = verdictMarkup(code, games);
     history.unshift({ code, title: games[0]?.title || '' });
     sheet.$('[data-history]').innerHTML = historyMarkup();
@@ -229,15 +238,24 @@ export function openScanner({ onCode = null } = {}) {
       const code = await readPhoto(file, r);
       if (!code) {
         status.textContent = 'Aucun code-barres lisible. Reprenez la photo de plus près, le code bien à plat et entier dans l’image.';
+        // Claude lit aussi le titre et les chiffres imprimes : la photo peut
+        // suffire, meme sans code-barres decodable.
+        if (actions.instance.identify && !onCode) {
+          status.textContent = 'Pas de code-barres sur cette photo : Claude peut reconnaître le jeu d’après ce qu’elle montre.';
+          lastCode = null;
+          lastPhoto = file;
+          verdictBox.innerHTML = `<button type="button" class="btn btn--primary btn--block id-block" data-identify="" data-run>${icon('spark')}Reconnaître le jeu avec Claude</button>`;
+        }
         return;
       }
       sheet.$('[data-manual]').elements.code.value = code;
-      await answer(code);
+      await answer(code, file);
     } catch (err) {
       status.textContent = `Photo illisible : ${err.message}`;
     }
   });
 
+  verdictBox.addEventListener('error', handleBrokenImage, true);
   verdictBox.addEventListener('click', (event) => {
     const open = event.target.closest('[data-open]');
     if (open) {
@@ -246,7 +264,23 @@ export function openScanner({ onCode = null } = {}) {
       return;
     }
     const add = event.target.closest('[data-add]');
-    if (add) actions.openEditor(null, { ean: add.dataset.add });
+    if (add) {
+      actions.openEditor(null, { ean: add.dataset.add });
+      return;
+    }
+    const identify = event.target.closest('[data-identify]');
+    if (identify) {
+      actions.openIdentify({
+        photo: lastPhoto,
+        ean: identify.dataset.identify,
+        eanSource: lastPhoto ? 'photo' : 'saisie',
+        // Photo sans code-barres : rien a ajouter avant que Claude ne la lise.
+        run: identify.hasAttribute('data-run'),
+        // La fiche validee devient le formulaire, a la place de cette
+        // fenetre : le retour ramene au scanner, pour le jeu suivant.
+        onConfirm: (game, from) => actions.openEditor(null, game, { from }),
+      });
+    }
   });
 
   return sheet;

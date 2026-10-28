@@ -13,7 +13,8 @@ export const actions = {
   openMenu: () => {},
   openTransfer: () => {},
   openFilters: () => {},
+  openIdentify: () => {},
   /** Remplace les filtres (et la recherche) par ceux donnes. */
   showOnly: () => {},
-  instance: { externalSearch: false, secure: false, version: '' },
+  instance: { externalSearch: false, identify: false, secure: false, version: '' },
 };

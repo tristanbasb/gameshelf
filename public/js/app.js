@@ -9,16 +9,17 @@ import { api } from './api.js';
 import { $, store, toast, openSheet, esc, icon, debounce } from './ui.js';
 import {
   collection, loadSnapshot, sync, onChange, query, matcher, facets,
-  EMPTY_FILTERS, SORTS, similarTitles, words, getGame,
+  EMPTY_FILTERS, SORTS, similarTitles, words, getGame, allGames,
 } from './data.js';
 import {
   renderResults, renderTally, createStrip, filtersMarkup, chipsMarkup,
-  activeFilterCount, emptyMarkup, handleBrokenImage, prune,
+  activeFilterCount, emptyMarkup, handleBrokenImage, prune, thumbUrl,
 } from './views.js';
 import { actions } from './actions.js';
 import { openDetail } from './detail.js';
 import { openEditor } from './editor.js';
 import { openScanner } from './scanner.js';
+import { openIdentify } from './identify.js';
 import { openStats } from './stats.js';
 import { openMenu, openTransfer } from './menu.js';
 
@@ -363,6 +364,7 @@ async function refreshFromServer({ quiet = false } = {}) {
   try {
     await sync();
     showNetwork('live');
+    keepThumbsOffline();
   } catch (err) {
     if (collection.ready) {
       showNetwork(navigator.onLine === false ? 'offline' : 'saved');
@@ -427,6 +429,27 @@ function registerServiceWorker() {
   });
 }
 
+/*
+ * Les miniatures de toute la collection partent dans le service worker, et
+ * pas seulement celles que la grille a deja affichees : en magasin, le jeu
+ * que l'on scanne doit avoir sa jaquette. La liste n'est renvoyee que si
+ * elle a change — une miniature que le serveur n'a pas pu fabriquer n'est
+ * pas redemandee a chaque retour sur l'onglet.
+ */
+let sentThumbs = '';
+
+function keepThumbsOffline() {
+  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+  const urls = [...new Set(allGames().map((g) => g.cover_url).filter(Boolean))].sort().map(thumbUrl);
+  const list = urls.join('\n');
+  if (list === sentThumbs) return;
+  sentThumbs = list;
+  // Apres l'affichage : les images visibles passent avant.
+  setTimeout(() => {
+    navigator.serviceWorker.ready.then((ready) => ready.active?.postMessage({ type: 'thumbs', urls }));
+  }, 3000);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Demarrage                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -439,6 +462,7 @@ Object.assign(actions, {
   openMenu,
   openTransfer,
   openFilters: openFilterSheet,
+  openIdentify,
   showOnly: (filters) => {
     el.q.value = filters.q || '';
     setFilters(filters, { replace: true });

@@ -21,8 +21,12 @@ cleanup() {
   if [[ -n "$CREATED_ID" ]]; then
     curl -sk -X DELETE "$BASE_URL/api/games/$CREATED_ID" >/dev/null || true
   fi
-  rm -f ./._smoke_image.png ./._smoke_image_faux.png 2>/dev/null || true
+  for id in ${THUMB_IDS[@]+"${THUMB_IDS[@]}"}; do
+    [[ -n "$id" ]] && curl -sk -X DELETE "$BASE_URL/api/games/$id" >/dev/null
+  done
+  rm -f ./._smoke_image.png ./._smoke_image_faux.png ./._smoke_icone.png 2>/dev/null || true
 }
+THUMB_IDS=()
 trap cleanup EXIT
 
 check() {
@@ -234,6 +238,10 @@ if [[ -n "$asset_path" ]]; then
   check "  les modules importes le sont aussi" \
     "$(status "$BASE_URL${asset_path%app.js}ui.js")" "200"
   contains "  page non mise en cache" "$(curl -sk -D- -o /dev/null "$BASE_URL/")" 'no-store'
+  # Le texte part compresse : la collection entiere pese sinon plusieurs
+  # centaines de kilo-octets a chaque ouverture depuis le telephone.
+  contains "  scripts servis compresses" \
+    "$(curl -sk -D- -o /dev/null -H 'Accept-Encoding: gzip' "$BASE_URL$asset_path")" 'Content-Encoding: gzip'
 else
   printf '%s  FAIL%s  aucune URL versionnee dans la page\n' "$c_red" "$c_reset"
   FAILURES=$((FAILURES + 1))
@@ -283,6 +291,67 @@ if printf '<script>alert(1)</script>' > ./._smoke_image_faux.png 2>/dev/null \
 else
   printf '%s  --  %s dossier non inscriptible : verification des images ignoree\n' \
     "$c_blue" "$c_reset"
+fi
+
+# --- 12. Miniatures des jaquettes -------------------------------------------
+# Le serveur telecharge et reduit lui-meme les jaquettes : il ne doit le faire
+# que pour une image deja utilisee par une fiche, et jamais vers une adresse
+# du reseau local.
+check "miniature sans src -> 400" "$(status "$BASE_URL/thumbs")" "400"
+check "miniature d une image qu aucune fiche n utilise -> 404" \
+  "$(status "$BASE_URL/thumbs?src=https%3A%2F%2Fexemple.invalid%2Fjaquette.jpg")" "404"
+
+# Fiche dont la jaquette pointe vers la machine elle-meme : la telecharger
+# ferait du serveur un relais vers le reseau local.
+local_body="$(curl -sk -H 'Content-Type: application/json' \
+  -d '{"title":"__smoke_miniature_locale__","cover_url":"http://127.0.0.1:9/jaquette.png"}' \
+  "$BASE_URL/api/games")"
+THUMB_IDS+=("$(printf '%s' "$local_body" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)")
+check "miniature vers une adresse locale refusee -> 403" \
+  "$(status "$BASE_URL/thumbs?src=http%3A%2F%2F127.0.0.1%3A9%2Fjaquette.png")" "403"
+
+# Fabrication de bout en bout, sans dependre d'Internet : l'icone de
+# l'application, televersee comme jaquette, sert d'image source.
+if curl -sk -o ./._smoke_icone.png "$BASE_URL/img/icon-192.png" 2>/dev/null; then
+  icone_url="$(curl -sk -F 'cover=@./._smoke_icone.png;type=image/png' "$BASE_URL/api/upload" \
+    | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')"
+  icone_body="$(curl -sk -H 'Content-Type: application/json' \
+    -d "{\"title\":\"__smoke_miniature__\",\"cover_url\":\"$icone_url\"}" "$BASE_URL/api/games")"
+  THUMB_IDS+=("$(printf '%s' "$icone_body" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)")
+
+  miniature="$BASE_URL/thumbs?src=$(printf '%s' "$icone_url" | sed 's|/|%2F|g')"
+  code_miniature="$(status "$miniature")"
+  if [[ "$code_miniature" == "503" ]]; then
+    printf '  note   miniatures indisponibles sur ce serveur (sharp absent) :\n'
+    printf '         la grille affiche les jaquettes d origine\n'
+  else
+    check "miniature d une jaquette televersee -> 200" "$code_miniature" "200"
+    entetes="$(curl -sk -D- -o /dev/null "$miniature")"
+    contains "  servie en WebP" "$entetes" 'image/webp'
+    contains "  gardee longtemps par le navigateur" "$entetes" 'immutable'
+    # Les octets eux-memes, pas seulement l'en-tete : un conteneur RIFF/WEBP.
+    contains "  contenu WebP reel" "$(curl -sk "$miniature" | head -c 12 | tail -c 4)" 'WEBP'
+  fi
+else
+  printf '%s  --  %s dossier non inscriptible : verification des miniatures ignoree\n' \
+    "$c_blue" "$c_reset"
+fi
+
+# --- 13. Identification par Claude ------------------------------------------
+# Chaque appel est facture sur le compte Anthropic : le test n'en fait aucun.
+# Il verifie que la fonction s'annonce telle qu'elle est configuree, et que
+# sans cle elle refuse proprement au lieu d'echouer.
+config_json="$(curl -sk "$BASE_URL/api/config")"
+if [[ "$config_json" == *'"identify":false'* ]]; then
+  identification="$(curl -sk -w '\n%{http_code}' -F 'ean=3711719050145' "$BASE_URL/api/identify")"
+  check "identification sans cle -> 503" "${identification##*$'\n'}" "503"
+  contains "  le message dit quelle cle renseigner" "$identification" 'ANTHROPIC_API_KEY'
+else
+  contains "identification annoncee" "$config_json" '"identify":true'
+  check "identification sans photo ni code -> 400" \
+    "$(status -X POST -F 'serial=SLES-50361' "$BASE_URL/api/identify")" "400"
+  check "identification avec un code malforme -> 400" \
+    "$(status -F 'ean=12ab' "$BASE_URL/api/identify")" "400"
 fi
 
 echo

@@ -13,11 +13,12 @@ import { actions } from './actions.js';
 
 const THEMES = [
   { key: 'dark', label: 'Sombre', icon: 'moon' },
+  { key: 'black', label: 'Noir', icon: 'black' },
   { key: 'light', label: 'Clair', icon: 'sun' },
   { key: 'auto', label: 'Système', icon: 'auto' },
 ];
 
-const SYSTEM_BAR = { dark: '#090d1f', light: '#eef1f8' };
+const SYSTEM_BAR = { dark: '#090d1f', black: '#000000', light: '#eef1f8' };
 const systemLight = window.matchMedia?.('(prefers-color-scheme: light)');
 
 export function applyTheme(choice) {
@@ -76,7 +77,9 @@ export function openMenu() {
   });
 
   sheet.el.addEventListener('click', async (event) => {
-    const themeButton = event.target.closest('[data-theme-choice]');
+    // Le bouton seul : <html> porte aussi data-theme-choice (voir theme.js),
+    // et tout clic du menu y remonterait.
+    const themeButton = event.target.closest('button[data-theme-choice]');
     if (themeButton) {
       const key = themeButton.dataset.themeChoice;
       store.set('gv-theme', key);

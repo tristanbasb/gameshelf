@@ -101,6 +101,9 @@ export const api = {
   importData: (content, format, mode, defaultPlatform) =>
     withBody('POST')('/api/import', { content, format, mode, defaultPlatform }),
 
+  /** Identification par Claude : `form` porte photo, ean, ean_source et serial. */
+  identify: (form, signal) => request('/api/identify', { method: 'POST', body: form, signal }),
+
   searchExternal: (q) => request(`/api/external/search?q=${encodeURIComponent(q)}`),
   externalGame: (id) => request(`/api/external/game/${id}`),
 };
