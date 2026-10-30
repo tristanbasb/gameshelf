@@ -123,7 +123,7 @@ sont préservés).
 sudo systemctl status gameshelf     # état du service
 sudo journalctl -u gameshelf -f     # logs en direct
 sudo systemctl restart gameshelf    # redémarrage
-sudo ./deploy/update.sh             # git pull + sauvegarde + redéploiement
+sudo ./deploy/update.sh             # depuis le clone : sauvegarde + git pull + redéploiement
 ```
 
 ### Avec Docker
