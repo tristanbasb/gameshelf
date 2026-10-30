@@ -337,7 +337,7 @@ else
     "$c_blue" "$c_reset"
 fi
 
-# --- 13. Identification par Claude ------------------------------------------
+# --- 13. Identification et discussion avec Claude ---------------------------
 # Chaque appel est facture sur le compte Anthropic : le test n'en fait aucun.
 # Il verifie que la fonction s'annonce telle qu'elle est configuree, et que
 # sans cle elle refuse proprement au lieu d'echouer.
@@ -346,12 +346,20 @@ if [[ "$config_json" == *'"identify":false'* ]]; then
   identification="$(curl -sk -w '\n%{http_code}' -F 'ean=3711719050145' "$BASE_URL/api/identify")"
   check "identification sans cle -> 503" "${identification##*$'\n'}" "503"
   contains "  le message dit quelle cle renseigner" "$identification" 'ANTHROPIC_API_KEY'
+  discussion="$(curl -sk -w '\n%{http_code}' -H 'Content-Type: application/json' \
+    -d '{"message":"Bonjour"}' "$BASE_URL/api/chat")"
+  check "discussion sans cle -> 503" "${discussion##*$'\n'}" "503"
 else
   contains "identification annoncee" "$config_json" '"identify":true'
   check "identification sans photo ni code -> 400" \
     "$(status -X POST -F 'serial=SLES-50361' "$BASE_URL/api/identify")" "400"
   check "identification avec un code malforme -> 400" \
     "$(status -F 'ean=12ab' "$BASE_URL/api/identify")" "400"
+  contains "discussion annoncee" "$config_json" '"chat":true'
+  check "discussion avec un message vide -> 400" \
+    "$(status -H 'Content-Type: application/json' -d '{"message":" "}' "$BASE_URL/api/chat")" "400"
+  check "discussion dans une conversation oubliee -> 404" \
+    "$(status -H 'Content-Type: application/json' -d '{"conversation":"inconnue","message":"Bonjour"}' "$BASE_URL/api/chat")" "404"
 fi
 
 echo

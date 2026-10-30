@@ -30,6 +30,11 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
   Claude retrouve le jeu, le serveur vérifie la proposition, et vous validez
   la fiche avant qu'elle ne remplisse le formulaire. Voir
   [Identifier un jeu avec Claude](#identifier-un-jeu-avec-claude).
+- **Discussion avec Claude** *(même clé)* : des questions en langage courant —
+  « quels jeux PS2 n'ont pas leur notice ? », « que vaut ma collection N64 ? ».
+  Claude consulte la collection pour répondre, cherche en ligne cotes et
+  éditions, et chaque jeu qu'il cite ouvre sa fiche. Voir
+  [Discuter avec Claude](#discuter-avec-claude).
 - **Recherche instantanée**, sans aller-retour avec le serveur : le titre, la
   plateforme, la région, le serial, les tags, les notes et le code-barres.
   Insensible aux accents et à la casse — « asterix » trouve « Astérix » —, les
@@ -87,7 +92,7 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
 
 ### Raccourcis clavier
 
-`Ctrl+K` ou `/` recherche · `s` scanner · `n` nouveau jeu · `Entrée` ferme le clavier du téléphone · `Échap` vide la recherche ou ferme la fenêtre
+`Ctrl+K` ou `/` recherche · `s` scanner · `n` nouveau jeu · `c` discuter avec Claude (si activé) · `Entrée` ferme le clavier du téléphone · `Échap` vide la recherche ou ferme la fenêtre
 
 ---
 
@@ -371,6 +376,43 @@ qu'Anthropic recommande.
 
 ---
 
+## Discuter avec Claude
+
+Avec la même clé (`ANTHROPIC_API_KEY`), **Discuter avec Claude** ouvre une
+conversation : dans le menu **Plus**, par l'icône de bulle dans l'en-tête sur
+ordinateur, ou avec la touche `C`. Sans clé, le menu **Plus** l'indique et dit
+quoi renseigner.
+
+**Ce que Claude peut faire.** Il ne connaît pas la collection d'avance : il la
+consulte avec deux outils, en lecture seule — une recherche (texte,
+plateforme, état, pièce manquante, favoris, ISO) et des statistiques
+(répartitions, pièces manquantes, doublons, derniers ajouts). Il compte au lieu
+de deviner, et chaque jeu qu'il cite est un lien vers sa fiche. Pour les cotes,
+les dates de sortie ou les éditions, il cherche sur le web (trois recherches
+au plus par étape) et ses sources s'affichent sous la réponse.
+
+**Ce qu'il ne fait pas.** Il ne modifie rien : pour ajouter, corriger ou
+supprimer un jeu, il indique le geste dans l'application.
+
+**La conversation.** La réponse s'écrit au fil de l'eau, et **Arrêter** la
+coupe ; le serveur oublie alors l'échange interrompu. La conversation affichée
+est gardée sur l'appareil. Claude, lui, s'en souvient tant que le service
+tourne, douze heures au plus sans message ; après un redémarrage, la question
+suivante repart de zéro et la fenêtre le signale. Le crayon en haut commence
+une nouvelle conversation.
+
+**Ce qui sort de la maison, et le coût.** Les messages, et ce que les outils
+renvoient de la collection pour y répondre, partent chez Anthropic. Chaque
+message est facturé sur le compte de la clé : quelques centimes, davantage
+pour une longue conversation ou une recherche web. Les consignes et le début
+de la conversation sont mis en cache, ce qui en réduit le coût d'un message à
+l'autre. Le journal du service note, pour chaque réponse, les jetons lus, dont
+ceux servis par le cache, les jetons écrits et le nombre de recherches. Un
+plafond de 60 messages par tranche de dix minutes protège d'une boucle qui
+s'emballerait.
+
+---
+
 ## Configuration
 
 Tout est optionnel : les valeurs par défaut conviennent à une installation
@@ -383,7 +425,7 @@ locale. Voir [`.env.example`](.env.example).
 | `DATA_DIR` | `./data` | Base SQLite, images et certificat |
 | `ENABLE_HTTPS` | `1` | HTTPS local auto-signé. `0` = HTTP simple, sans scan par caméra |
 | `RAWG_API_KEY` | *(vide)* | Active le pré-remplissage en ligne ([rawg.io/apidocs](https://rawg.io/apidocs)) |
-| `ANTHROPIC_API_KEY` | *(vide)* | Active l'[identification par Claude](#identifier-un-jeu-avec-claude) ([console.anthropic.com](https://console.anthropic.com)) |
+| `ANTHROPIC_API_KEY` | *(vide)* | Active l'[identification](#identifier-un-jeu-avec-claude) et la [discussion](#discuter-avec-claude) avec Claude ([console.anthropic.com](https://console.anthropic.com)) |
 | `MAX_UPLOAD_MB` | `5` | Taille maximale d'une image |
 
 > **Aucune authentification** : toute personne ayant accès au réseau local peut
@@ -528,6 +570,7 @@ adresses locales) et supprime les données de test qu'il a créées.
 | `GET` | `/thumbs?src=` | Miniature WebP d'une jaquette utilisée par une fiche |
 | `GET` | `/api/external/search?q=` | Recherche RAWG (si clé configurée) |
 | `POST` | `/api/identify` | Identification par Claude (`multipart` : `photo`, `ean`, `ean_source`, `serial`) — propose, n'enregistre rien |
+| `POST` | `/api/chat` | Discussion avec Claude (`{conversation, message}`) — réponse en flux `text/event-stream` : `conversation`, `text`, `activity`, `sources`, puis `done` ou `error` |
 
 Paramètres de `GET /api/games` : `search`, `ean`, `serial`, `platform`,
 `region`, `condition`, `tag`, `favorite=1`, `incomplete=1`, `iso=0|1`,
@@ -551,12 +594,13 @@ src/            serveur Express, accès SQLite, routes
   uploads.js    entretien des jaquettes orphelines
   miniatures.js miniatures des jaquettes : téléchargement sûr, réduction, cache
   identification.js  identification par Claude et vérification de la proposition
-  routes/       jeux, import-export, recherche externe, identification
+  discussion.js discussion avec Claude : outils de lecture de la collection, réponse en flux
+  routes/       jeux, import-export, recherche externe, identification, discussion
 public/         interface (HTML, CSS, JS natif — aucun build)
   js/data.js    la collection en mémoire : recherche, filtres, tri, copie locale
   js/views.js   jaquettes, étagère, liste, frise, panneau de filtres
   js/platforms.js  couleurs et dimensions des boîtiers par plateforme
-  js/detail.js, editor.js, scanner.js, identify.js, stats.js, menu.js  les fenêtres
+  js/detail.js, editor.js, scanner.js, identify.js, chat.js, stats.js, menu.js  les fenêtres
   sw.js         service worker : ouverture hors ligne
 deploy/         install.sh, update.sh, unité systemd
 scripts/        sauvegarde, test de bout en bout, smoke-test

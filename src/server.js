@@ -16,6 +16,7 @@ import gamesRoutes from './routes/games.routes.js';
 import dataRoutes from './routes/data.routes.js';
 import externalRoutes from './routes/external.routes.js';
 import identificationRoutes from './routes/identification.routes.js';
+import discussionRoutes from './routes/discussion.routes.js';
 
 const publicDir = path.join(config.root, 'public');
 const app = express();
@@ -291,6 +292,7 @@ app.get('/api/config', (req, res) => {
     version: appVersion,
     externalSearch: Boolean(config.rawgApiKey),
     identify: Boolean(config.anthropicApiKey),
+    chat: Boolean(config.anthropicApiKey),
     // L'interface previent l'utilisateur quand la camera sera refusee.
     secure: req.secure || req.hostname === 'localhost',
   });
@@ -347,11 +349,18 @@ app.use('/api/identify', limite({
   secondes: 600,
   message: 'Trop d identifications d affilee, patientez quelques minutes',
 }));
+app.use('/api/chat', limite({
+  nom: 'discussion',
+  max: 60,
+  secondes: 600,
+  message: 'Trop de messages d affilee, patientez quelques minutes',
+}));
 
 app.use('/api', gamesRoutes);
 app.use('/api', dataRoutes);
 app.use('/api', externalRoutes);
 app.use('/api', identificationRoutes);
+app.use('/api', discussionRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Route inconnue' });

@@ -14,7 +14,8 @@ export const actions = {
   openTransfer: () => {},
   openFilters: () => {},
   openIdentify: () => {},
+  openChat: () => {},
   /** Remplace les filtres (et la recherche) par ceux donnes. */
   showOnly: () => {},
-  instance: { externalSearch: false, identify: false, secure: false, version: '' },
+  instance: { externalSearch: false, identify: false, chat: false, secure: false, version: '' },
 };
