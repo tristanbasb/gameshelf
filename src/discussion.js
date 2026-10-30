@@ -25,8 +25,8 @@ import Anthropic, {
 } from '@anthropic-ai/sdk';
 import { db, normalizeForSearch } from './db.js';
 import { config } from './config.js';
+import { modelePour, parametresModele, rechercheWeb } from './modeles.js';
 
-const MODELE = 'claude-opus-5-5';
 const EFFORT = 'medium';
 
 /** Recherches web permises par etape : chacune est facturee. */
@@ -70,13 +70,7 @@ const ETATS = ['sealed', 'mint', 'good', 'fair', 'poor', 'none'];
 const PIECES = { box: 'has_box', cover_art: 'has_cover_art', manual: 'has_manual', disc: 'has_disc' };
 const PIECES_FR = { has_box: 'boîte', has_cover_art: 'jaquette', has_manual: 'notice', has_disc: 'disque' };
 
-const OUTILS = [
-  {
-    type: 'web_search_20260209',
-    name: 'web_search',
-    max_uses: RECHERCHES_MAX,
-    user_location: { type: 'approximate', country: 'FR' },
-  },
+const OUTILS_COLLECTION = [
   {
     name: 'chercher_jeux',
     description: 'Cherche dans la collection de l’utilisateur et renvoie les fiches trouvées (identifiant, titre, plateforme, région, état, pièces manquantes, ISO, favori, serial, code-barres, tags, notes, date d’ajout) et leur nombre total. Sans aucun critère, parcourt toute la collection dans la limite demandée. Les critères se combinent.',
@@ -110,6 +104,12 @@ const OUTILS = [
     eager_input_streaming: true,
     input_schema: { type: 'object', additionalProperties: false, properties: {}, required: [] },
   },
+];
+
+/** Outils d'une conversation : la recherche web, dans la version du modele, puis la collection. */
+const outils = (modele) => [
+  rechercheWeb(modele, { max_uses: RECHERCHES_MAX, user_location: { type: 'approximate', country: 'FR' } }),
+  ...OUTILS_COLLECTION,
 ];
 
 /* --------------------------------------------------------------------------
@@ -277,11 +277,32 @@ function oublierLesAnciennes() {
   while (conversations.size > CONVERSATIONS_MAX) conversations.delete(conversations.keys().next().value);
 }
 
-/** La conversation demandee, une nouvelle si `id` est vide, ou null si elle a ete oubliee. */
+/**
+ * La conversation demandee, une nouvelle si `id` est vide, ou null si elle a
+ * ete oubliee.
+ *
+ * Une conversation garde jusqu'au bout le modele, les consignes et les outils
+ * de son premier message. Changer de modele en cours de route changerait les
+ * outils (la recherche web n'a pas la meme version partout), et l'API refuse
+ * les blocs de reflexion d'un historique modifie. Un nouveau modele vaut donc
+ * pour la conversation suivante.
+ */
 export function conversation(id) {
   oublierLesAnciennes();
   if (id) return conversations.get(id) || null;
-  const nouvelle = { id: crypto.randomUUID(), messages: [], vue: Date.now(), occupee: false };
+  const modele = modelePour('chat');
+  const jour = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const nouvelle = {
+    id: crypto.randomUUID(),
+    modele,
+    // La date aide Claude a savoir ce qui a pu changer depuis son entrainement :
+    // cotes, sorties, prix. Elle est fixee au premier message, comme le reste.
+    systeme: `${SYSTEME}\n\nNous sommes le ${jour}.`,
+    outils: outils(modele),
+    messages: [],
+    vue: Date.now(),
+    occupee: false,
+  };
   conversations.set(nouvelle.id, nouvelle);
   return nouvelle;
 }
@@ -349,16 +370,14 @@ export async function repondre(conv, texte, envoyer, signal) {
   try {
     for (let etape = 0; etape < ETAPES_MAX; etape += 1) {
       const flux = claude().beta.messages.stream({
-        model: MODELE,
+        ...parametresModele(conv.modele),
         max_tokens: 16000,
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
         output_config: { effort: EFFORT },
         // Consignes, outils et debut de conversation sont relus a chaque
         // message : la mise en cache en divise le cout.
         cache_control: { type: 'ephemeral' },
-        system: SYSTEME,
-        tools: OUTILS,
+        system: conv.systeme,
+        tools: conv.outils,
         messages: conv.messages,
       }, { signal });
 
@@ -401,7 +420,7 @@ export async function repondre(conv, texte, envoyer, signal) {
       const appels = message.content.filter((b) => b.type === 'tool_use');
       if (!appels.length) {
         console.log(
-          `  Discussion : ${usage.lus + usage.caches} jetons lus (dont ${usage.caches} en cache), `
+          `  Discussion (${message.model}) : ${usage.lus + usage.caches} jetons lus (dont ${usage.caches} en cache), `
           + `${usage.ecrits} ecrits, ${usage.recherches} recherche(s)`,
         );
         return;

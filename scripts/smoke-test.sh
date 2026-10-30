@@ -349,6 +349,9 @@ if [[ "$config_json" == *'"identify":false'* ]]; then
   discussion="$(curl -sk -w '\n%{http_code}' -H 'Content-Type: application/json' \
     -d '{"message":"Bonjour"}' "$BASE_URL/api/chat")"
   check "discussion sans cle -> 503" "${discussion##*$'\n'}" "503"
+  contains "aucun modele annonce sans cle" "$config_json" '"models":null'
+  check "choix d un modele sans cle -> 503" \
+    "$(status -X PUT -H 'Content-Type: application/json' -d '{"chat":"claude-haiku-5-5"}' "$BASE_URL/api/models")" "503"
 else
   contains "identification annoncee" "$config_json" '"identify":true'
   check "identification sans photo ni code -> 400" \
@@ -360,6 +363,15 @@ else
     "$(status -H 'Content-Type: application/json' -d '{"message":" "}' "$BASE_URL/api/chat")" "400"
   check "discussion dans une conversation oubliee -> 404" \
     "$(status -H 'Content-Type: application/json' -d '{"conversation":"inconnue","message":"Bonjour"}' "$BASE_URL/api/chat")" "404"
+  contains "modeles proposes" "$config_json" '"choices":['
+  check "choix d un modele inconnu -> 400" \
+    "$(status -X PUT -H 'Content-Type: application/json' -d '{"chat":"gpt-5"}' "$BASE_URL/api/models")" "400"
+  # Le modele deja retenu, renvoye tel quel : le reglage de l'instance ne change pas.
+  modele_chat="$(printf '%s' "$config_json" | sed -n 's/.*"chat":"\([^"]*\)".*/\1/p')"
+  choix="$(curl -sk -w '\n%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"chat\":\"$modele_chat\"}" "$BASE_URL/api/models")"
+  check "choix d un modele propose -> 200" "${choix##*$'\n'}" "200"
+  contains "  le modele retenu est renvoye" "$choix" "\"chat\":\"$modele_chat\""
 fi
 
 echo

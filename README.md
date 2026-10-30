@@ -35,6 +35,9 @@ externe : un serveur Node.js et un fichier SQLite sur votre réseau.
   Claude consulte la collection pour répondre, cherche en ligne cotes et
   éditions, et chaque jeu qu'il cite ouvre sa fiche. Voir
   [Discuter avec Claude](#discuter-avec-claude).
+- **Un modèle Claude par usage**, choisi dans le menu **Plus** : Opus pour
+  identifier, Haiku pour discuter à moindre coût, par exemple. Voir
+  [Choisir le modèle](#choisir-le-modèle).
 - **Recherche instantanée**, sans aller-retour avec le serveur : le titre, la
   plateforme, la région, le serial, les tags, les notes et le code-barres.
   Insensible aux accents et à la casse — « asterix » trouve « Astérix » —, les
@@ -367,12 +370,13 @@ doit avoir accès à Internet ; en magasin, sans réseau, le scan fonctionne
 comme avant, mais pas l'identification.
 
 **Le coût.** Chaque identification est facturée sur le compte de la clé :
-de l'ordre de 10 à 15 centimes selon le nombre de recherches (Claude Opus 5.5,
-cinq recherches au plus). Le journal du service note, pour chacune, les jetons
-lus et écrits et le nombre de recherches. Un plafond de 40 identifications par
-tranche de dix minutes protège d'une boucle qui s'emballerait. Si le modèle
-décline une demande, l'API la rejoue d'elle-même sur le modèle de repli
-qu'Anthropic recommande.
+de l'ordre de 10 à 15 centimes selon le nombre de recherches avec Claude Opus
+5.5, le modèle par défaut (cinq recherches au plus ; voir
+[Choisir le modèle](#choisir-le-modèle)). Le journal du service note, pour
+chacune, le modèle, les jetons lus et écrits et le nombre de recherches. Un
+plafond de 40 identifications par tranche de dix minutes protège d'une boucle
+qui s'emballerait. Si le modèle décline une demande, l'API la rejoue d'elle-même
+sur le modèle de repli qu'Anthropic recommande (sauf Haiku, qui n'en a pas).
 
 ---
 
@@ -413,6 +417,31 @@ s'emballerait.
 
 ---
 
+## Choisir le modèle
+
+Dans le menu **Plus**, la rubrique **Modèles Claude** propose deux listes : le
+modèle qui identifie un jeu, et celui qui discute. Le choix est gardé sur le
+serveur et vaut pour tous les appareils.
+
+| Modèle | Prix (par million de jetons, lus / écrits) | |
+|---|---|---|
+| Claude Fable 5.1 | 10 $ / 50 $ | Le plus capable, et le plus lent |
+| Claude Opus 5.5 | 4 $ / 20 $ | Le modèle par défaut |
+| Claude Sonnet 5.5 | 2 $ / 10 $ | |
+| Claude Haiku 5.5 | 0,10 $ / 0,50 $ | Recherche web sans filtrage des résultats, pas de modèle de repli |
+
+L'identification demande de lire de petits caractères sur une photo et de
+recouper des sources : gardez-y un modèle capable. La vérification du serveur
+reste la même, quel que soit le modèle. Pour la discussion, un modèle moins cher
+peut suffire : essayez-le.
+
+Une conversation garde le modèle avec lequel elle a commencé : le nom s'affiche
+à côté du titre de la fenêtre, et le crayon en ouvre une nouvelle avec le modèle
+choisi. Tant que rien n'est choisi dans le menu, `ANTHROPIC_MODEL` donne le
+modèle par défaut (Claude Opus 5.5 sinon).
+
+---
+
 ## Configuration
 
 Tout est optionnel : les valeurs par défaut conviennent à une installation
@@ -426,6 +455,7 @@ locale. Voir [`.env.example`](.env.example).
 | `ENABLE_HTTPS` | `1` | HTTPS local auto-signé. `0` = HTTP simple, sans scan par caméra |
 | `RAWG_API_KEY` | *(vide)* | Active le pré-remplissage en ligne ([rawg.io/apidocs](https://rawg.io/apidocs)) |
 | `ANTHROPIC_API_KEY` | *(vide)* | Active l'[identification](#identifier-un-jeu-avec-claude) et la [discussion](#discuter-avec-claude) avec Claude ([console.anthropic.com](https://console.anthropic.com)) |
+| `ANTHROPIC_MODEL` | `claude-opus-5-5` | Modèle Claude par défaut, tant qu'aucun n'est [choisi dans le menu](#choisir-le-modèle) : `claude-fable-5-1`, `claude-opus-5-5`, `claude-sonnet-5-5` ou `claude-haiku-5-5` |
 | `MAX_UPLOAD_MB` | `5` | Taille maximale d'une image |
 
 > **Aucune authentification** : toute personne ayant accès au réseau local peut
@@ -570,7 +600,8 @@ adresses locales) et supprime les données de test qu'il a créées.
 | `GET` | `/thumbs?src=` | Miniature WebP d'une jaquette utilisée par une fiche |
 | `GET` | `/api/external/search?q=` | Recherche RAWG (si clé configurée) |
 | `POST` | `/api/identify` | Identification par Claude (`multipart` : `photo`, `ean`, `ean_source`, `serial`) — propose, n'enregistre rien |
-| `POST` | `/api/chat` | Discussion avec Claude (`{conversation, message}`) — réponse en flux `text/event-stream` : `conversation`, `text`, `activity`, `sources`, puis `done` ou `error` |
+| `POST` | `/api/chat` | Discussion avec Claude (`{conversation, message}`) — réponse en flux `text/event-stream` : `conversation` (identifiant, modèle), `text`, `activity`, `sources`, puis `done` ou `error` |
+| `PUT` | `/api/models` | Modèle Claude de chaque usage (`{identify, chat}`, l'un ou l'autre) ; la liste proposée est dans `/api/config` |
 
 Paramètres de `GET /api/games` : `search`, `ean`, `serial`, `platform`,
 `region`, `condition`, `tag`, `favorite=1`, `incomplete=1`, `iso=0|1`,
@@ -595,7 +626,8 @@ src/            serveur Express, accès SQLite, routes
   miniatures.js miniatures des jaquettes : téléchargement sûr, réduction, cache
   identification.js  identification par Claude et vérification de la proposition
   discussion.js discussion avec Claude : outils de lecture de la collection, réponse en flux
-  routes/       jeux, import-export, recherche externe, identification, discussion
+  modeles.js    modèles Claude proposés, options de chacun, choix par usage
+  routes/       jeux, import-export, recherche externe, identification, discussion, modèles
 public/         interface (HTML, CSS, JS natif — aucun build)
   js/data.js    la collection en mémoire : recherche, filtres, tri, copie locale
   js/views.js   jaquettes, étagère, liste, frise, panneau de filtres

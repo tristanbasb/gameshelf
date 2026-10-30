@@ -1,5 +1,5 @@
 /*
- * Menu « Plus » : theme, import et export, a propos.
+ * Menu « Plus » : modeles Claude, theme, import et export, a propos.
  */
 
 import { api } from './api.js';
@@ -37,9 +37,28 @@ applyTheme(store.get('gv-theme') || 'auto');
 /* Menu                                                                       */
 /* -------------------------------------------------------------------------- */
 
+const USAGES = [
+  { key: 'identify', label: 'Identifier un jeu', saved: 'Identification' },
+  { key: 'chat', label: 'Discussion', saved: 'Discussion, dès la prochaine conversation' },
+];
+
+/* Un modele par usage : on peut identifier avec Opus et discuter avec Haiku. */
+function modelsMarkup(models) {
+  return `<h3 class="section-label" style="margin-top:22px">Modèles Claude</h3>
+    <div class="form-grid">${USAGES.map((u) => `
+      <div class="field">
+        <label for="model-${u.key}">${esc(u.label)}</label>
+        <span class="select"><select id="model-${u.key}" data-model="${u.key}">${models.choices.map((m) => `
+          <option value="${esc(m.id)}"${m.id === models[u.key] ? ' selected' : ''}>${esc(m.name.replace(/^Claude /, ''))} · ${esc(m.price)}</option>`).join('')}
+        </select></span>
+      </div>`).join('')}
+    </div>
+    <p class="hint" style="margin-top:10px">Prix par million de jetons, lus / écrits. Une conversation garde le modèle avec lequel elle a commencé : le crayon en ouvre une nouvelle.</p>`;
+}
+
 export function openMenu() {
   const choice = store.get('gv-theme') || 'auto';
-  const { version, secure, chat } = actions.instance;
+  const { version, secure, chat, models } = actions.instance;
   const saved = collection.savedAt ? new Date(collection.savedAt).toLocaleString('fr-FR') : '';
 
   const sheet = openSheet({
@@ -68,6 +87,7 @@ export function openMenu() {
           ${secure ? '' : `<a class="menu-item" href="/cert.pem" download>${icon('scan', { size: 22 })}
             <span><strong>Certificat du serveur</strong><span>À installer sur le téléphone pour autoriser l’appareil photo</span></span></a>`}
         </div>
+        ${models ? modelsMarkup(models) : ''}
 
         <h3 class="section-label" style="margin-top:22px">Thème</h3>
         <div class="theme-choice" role="radiogroup" aria-label="Thème">${THEMES.map((t) => `
@@ -108,6 +128,23 @@ export function openMenu() {
       } catch (err) {
         toast(`Serveur injoignable : ${err.message}`, { tone: 'error' });
       }
+    }
+  });
+
+  sheet.el.addEventListener('change', async (event) => {
+    const select = event.target.closest('select[data-model]');
+    if (!select) return;
+    const usage = USAGES.find((u) => u.key === select.dataset.model);
+    select.disabled = true;
+    try {
+      Object.assign(models, await api.setModels({ [usage.key]: select.value }));
+      const name = models.choices.find((m) => m.id === models[usage.key])?.name;
+      toast(`${usage.saved} : ${name}`);
+    } catch (err) {
+      select.value = models[usage.key];
+      toast(`Modèle non enregistré : ${err.message}`, { tone: 'error' });
+    } finally {
+      select.disabled = false;
     }
   });
   return sheet;

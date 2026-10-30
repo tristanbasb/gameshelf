@@ -1877,6 +1877,16 @@ mark {
 /* Une hauteur fixe : la conversation defile, la zone de saisie reste en bas. */
 .sheet--chat { width: min(94vw, 680px); height: min(86dvh, 820px); }
 .sheet--chat .sheet-wrap { height: 100%; }
+/* Le modele qui repond, discret a cote du titre. */
+.chat-model {
+  margin-left: 4px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  font-stretch: normal;
+  letter-spacing: 0.04em;
+}
 .chat-log { display: flex; flex-direction: column; gap: 16px; }
 
 .chat-empty { margin: auto 0; padding: 12px 6px; color: var(--text-2); font-size: 14.5px; line-height: 1.5; text-align: center; }

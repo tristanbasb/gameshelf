@@ -32,8 +32,7 @@ import { db } from './db.js';
 import { config } from './config.js';
 import { eanVariants } from './games.js';
 import { typeImageReel } from './images.js';
-
-const MODELE = 'claude-opus-5-5';
+import { modelePour, parametresModele, rechercheWeb } from './modeles.js';
 
 /*
  * Effort moyen : lire une photo, chercher un code et recouper trois indices
@@ -247,6 +246,7 @@ async function interroger({ photo, ean, eanSource, serial }) {
   if (photo) content.push({ type: 'image', source: { type: 'base64', ...photo } });
   content.push({ type: 'text', text: consigneUtilisateur({ ean, eanSource, serial, avecPhoto: Boolean(photo) }) });
   const messages = [{ role: 'user', content }];
+  const choisi = modelePour('identify');
 
   const pages = new Map();
   const usage = { lus: 0, ecrits: 0, recherches: 0 };
@@ -256,22 +256,16 @@ async function interroger({ photo, ean, eanSource, serial }) {
     let reponse;
     try {
       reponse = await claude().beta.messages.create({
-        model: MODELE,
+        ...parametresModele(choisi),
         max_tokens: 16000,
-        // Si les garde-fous du modele declinent la demande, l'API la rejoue
-        // d'elle-meme sur le modele de repli qu'Anthropic recommande.
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
         output_config: { effort: EFFORT },
         system: SYSTEME,
         tools: [
-          {
-            type: 'web_search_20260209',
-            name: 'web_search',
+          rechercheWeb(choisi, {
             max_uses: RECHERCHES_MAX,
             // La collection est europeenne : les fiches PAL d'abord.
             user_location: { type: 'approximate', country: 'FR' },
-          },
+          }),
           OUTIL,
         ],
         messages,

@@ -17,5 +17,5 @@ export const actions = {
   openChat: () => {},
   /** Remplace les filtres (et la recherche) par ceux donnes. */
   showOnly: () => {},
-  instance: { externalSearch: false, identify: false, chat: false, secure: false, version: '' },
+  instance: { externalSearch: false, identify: false, chat: false, models: null, secure: false, version: '' },
 };

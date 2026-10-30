@@ -101,6 +101,8 @@ export const config = {
   // Identification d'un jeu par Claude (voir identification.js). Sans cle,
   // la fonction n'apparait pas.
   anthropicApiKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
+  // Modele par defaut, tant qu'aucun n'est choisi dans le menu (voir modeles.js).
+  anthropicModel: (process.env.ANTHROPIC_MODEL || '').trim(),
   maxUploadBytes: int(process.env.MAX_UPLOAD_MB, 5) * 1024 * 1024,
   nodeEnv: process.env.NODE_ENV || 'production',
 };
