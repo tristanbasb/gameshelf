@@ -39,7 +39,7 @@ applyTheme(store.get('gv-theme') || 'auto');
 
 export function openMenu() {
   const choice = store.get('gv-theme') || 'auto';
-  const { version, secure } = actions.instance;
+  const { version, secure, chat } = actions.instance;
   const saved = collection.savedAt ? new Date(collection.savedAt).toLocaleString('fr-FR') : '';
 
   const sheet = openSheet({
@@ -52,6 +52,13 @@ export function openMenu() {
       </div>
       <div class="sheet-body">
         <div class="menu-list">
+          ${chat
+            ? `<button type="button" class="menu-item" data-go="chat">${icon('chat', { size: 22 })}
+              <span><strong>Discuter avec Claude</strong><span>Questions sur la collection, cotes, éditions</span></span></button>`
+            // Sans cle, la fonction ne disparait pas sans laisser de trace :
+            // on dit ce qui manque pour l'activer.
+            : `<div class="menu-item is-off">${icon('chat', { size: 22 })}
+              <span><strong>Claude : inactif</strong><span>Pour discuter avec Claude et identifier un jeu en photo, renseignez ANTHROPIC_API_KEY dans le fichier .env du serveur, puis redémarrez-le.</span></span></div>`}
           <button type="button" class="menu-item" data-go="transfer">${icon('transfer', { size: 22 })}
             <span><strong>Import et export</strong><span>CSV, JSON, sauvegarde complète de la base</span></span></button>
           <button type="button" class="menu-item" data-go="stats">${icon('chart', { size: 22 })}
@@ -71,7 +78,7 @@ export function openMenu() {
         <p class="about">
           GameVault${version ? ` ${esc(version)}` : ''} · ${fmtNumber(collection.byId.size)} jeux<br>
           ${collection.live ? 'Collection à jour avec le serveur.' : `Copie locale${saved ? ` du ${esc(saved)}` : ''} : consultation et scan uniquement.`}<br>
-          Raccourcis : / ou Ctrl+K recherche · S scanner · N ajouter
+          Raccourcis : / ou Ctrl+K recherche · S scanner · N ajouter${chat ? ' · C Claude' : ''}
         </p>
       </div></div>`,
   });
@@ -90,7 +97,8 @@ export function openMenu() {
       return;
     }
     const go = event.target.closest('[data-go]')?.dataset.go;
-    if (go === 'transfer') openTransfer({ from: sheet });
+    if (go === 'chat') actions.openChat();
+    else if (go === 'transfer') openTransfer({ from: sheet });
     else if (go === 'stats') actions.openStats();
     else if (go === 'refresh') {
       try {

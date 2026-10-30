@@ -20,6 +20,7 @@ import { openDetail } from './detail.js';
 import { openEditor } from './editor.js';
 import { openScanner } from './scanner.js';
 import { openIdentify } from './identify.js';
+import { openChat } from './chat.js';
 import { openStats } from './stats.js';
 import { openMenu, openTransfer } from './menu.js';
 
@@ -304,6 +305,7 @@ function bindEvents() {
     else if (action === 'add-title') openEditor(null, { title: state.filters.q.trim() });
     else if (action === 'stats') openStats();
     else if (action === 'menu') openMenu();
+    else if (action === 'chat') openChat();
     else if (action === 'io') openTransfer();
     else if (action === 'filters') openFilterSheet();
     else if (action === 'reset') {
@@ -331,6 +333,9 @@ function bindEvents() {
     } else if (event.key === 'n' || event.key === 'N') {
       event.preventDefault();
       openEditor();
+    } else if ((event.key === 'c' || event.key === 'C') && actions.instance.chat) {
+      event.preventDefault();
+      openChat();
     }
   });
 
@@ -463,6 +468,7 @@ Object.assign(actions, {
   openTransfer,
   openFilters: openFilterSheet,
   openIdentify,
+  openChat,
   showOnly: (filters) => {
     el.q.value = filters.q || '';
     setFilters(filters, { replace: true });
@@ -481,7 +487,11 @@ async function init() {
 
   // La copie locale s'affiche tout de suite ; le serveur confirme ensuite.
   loadSnapshot();
-  api.config().then((config) => Object.assign(actions.instance, config)).catch(() => {});
+  api.config().then((config) => {
+    Object.assign(actions.instance, config);
+    // Le bouton de l'en-tete n'apparait qu'avec une cle Anthropic.
+    for (const button of document.querySelectorAll('[data-needs-claude]')) button.hidden = !config.chat;
+  }).catch(() => {});
   await refreshFromServer({ quiet: true });
 
   // Raccourcis de l'ecran d'accueil du telephone.
