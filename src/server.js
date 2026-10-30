@@ -17,6 +17,8 @@ import dataRoutes from './routes/data.routes.js';
 import externalRoutes from './routes/external.routes.js';
 import identificationRoutes from './routes/identification.routes.js';
 import discussionRoutes from './routes/discussion.routes.js';
+import modelesRoutes from './routes/modeles.routes.js';
+import { catalogue, modelesChoisis } from './modeles.js';
 
 const publicDir = path.join(config.root, 'public');
 const app = express();
@@ -293,6 +295,8 @@ app.get('/api/config', (req, res) => {
     externalSearch: Boolean(config.rawgApiKey),
     identify: Boolean(config.anthropicApiKey),
     chat: Boolean(config.anthropicApiKey),
+    // Les modeles proposes, et celui de chaque usage.
+    models: config.anthropicApiKey ? { choices: catalogue(), ...modelesChoisis() } : null,
     // L'interface previent l'utilisateur quand la camera sera refusee.
     secure: req.secure || req.hostname === 'localhost',
   });
@@ -361,6 +365,7 @@ app.use('/api', dataRoutes);
 app.use('/api', externalRoutes);
 app.use('/api', identificationRoutes);
 app.use('/api', discussionRoutes);
+app.use('/api', modelesRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Route inconnue' });

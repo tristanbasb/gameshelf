@@ -69,6 +69,12 @@ const migrations = [
     const update = db.prepare('UPDATE games SET search_text = ? WHERE id = ?');
     for (const row of rows) update.run(buildSearchText(row), row.id);
   },
+
+  function addSettings() {
+    // Reglages faits depuis l'interface et valables pour tous les appareils :
+    // le modele Claude de chaque usage (voir modeles.js).
+    db.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  },
 ];
 
 /**

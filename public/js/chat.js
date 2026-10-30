@@ -126,16 +126,17 @@ function activityLabel({ kind, query }) {
 function load() {
   try {
     const saved = JSON.parse(store.get(STORE_KEY) || 'null');
-    if (saved && Array.isArray(saved.items)) return { id: saved.id || '', items: saved.items };
+    if (saved && Array.isArray(saved.items)) return { id: saved.id || '', model: saved.model || '', items: saved.items };
   } catch {
     /* copie illisible : on repart d'une conversation vide */
   }
-  return { id: '', items: [] };
+  return { id: '', model: '', items: [] };
 }
 
 function save(state) {
   store.set(STORE_KEY, JSON.stringify({
     id: state.id,
+    model: state.model,
     // L'etat d'une reponse en cours n'a pas a survivre a la fenetre.
     items: state.items.slice(-GARDES).map(({ streaming: _streaming, activity: _activity, ...item }) => item),
   }));
@@ -176,6 +177,13 @@ const emptyMarkup = () => `<div class="chat-empty">
   <div class="suggest">${SUGGESTIONS.map((s) => `<button type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join('')}</div>
 </div>`;
 
+/* Le modele de la conversation ; avant le premier message, celui choisi dans le menu. */
+function modelName(state) {
+  const { models } = actions.instance;
+  const name = state.model || models?.choices.find((m) => m.id === models.chat)?.name || '';
+  return name.replace(/^Claude /, '');
+}
+
 export function openChat() {
   const state = load();
   let pending = null;
@@ -185,7 +193,7 @@ export function openChat() {
     label: 'Discuter avec Claude',
     content: `<div class="sheet-wrap">
       <div class="sheet-head">
-        <h2 class="sheet-title">Claude</h2>
+        <h2 class="sheet-title">Claude <span class="chat-model" data-model-name>${esc(modelName(state))}</span></h2>
         <button type="button" class="icon-btn" data-new title="Nouvelle conversation" aria-label="Nouvelle conversation">${icon('edit')}</button>
         <button type="button" class="icon-btn" data-close aria-label="Fermer">${icon('close')}</button>
       </div>
@@ -206,6 +214,9 @@ export function openChat() {
   const form = sheet.$('[data-form]');
   const input = form.elements.message;
   const sendButton = sheet.$('[data-send]');
+  const showModel = () => {
+    sheet.$('[data-model-name]').textContent = modelName(state);
+  };
 
   const nearBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 80;
   const toBottom = () => {
@@ -251,6 +262,7 @@ export function openChat() {
       if (response.status === 404 && payload.forgotten && !retried) {
         // Le service a redemarre : la question repart dans une conversation neuve.
         state.id = '';
+        state.model = '';
         reply.notice = 'Claude a oublié la conversation précédente (le serveur a redémarré) : il repart de zéro.';
         renderLast();
         return stream(text, reply, signal, true);
@@ -261,6 +273,8 @@ export function openChat() {
     for await (const { event, data } of readEvents(response.body)) {
       if (event === 'conversation') {
         state.id = data.id;
+        state.model = data.model || '';
+        showModel();
       } else if (event === 'text') {
         reply.text += data.t;
         reply.activity = '';
@@ -340,8 +354,10 @@ export function openChat() {
     if (event.target.closest('[data-new]')) {
       pending?.abort();
       state.id = '';
+      state.model = '';
       state.items = [];
       save(state);
+      showModel();
       renderAll();
       input.focus({ preventScroll: true });
     }

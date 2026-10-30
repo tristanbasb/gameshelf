@@ -15,7 +15,7 @@ const PING_MS = 15_000;
 
 /**
  * POST /api/chat : `{ conversation, message }`. La reponse est un flux
- * d'evenements serveur : `conversation` (identifiant), `text`, `activity`,
+ * d'evenements serveur : `conversation` (identifiant, modele), `text`, `activity`,
  * `sources`, puis `done` ou `error`. Une conversation oubliee (redemarrage du
  * service) repond 404 avant tout flux : l'interface en recommence une.
  */
@@ -62,7 +62,7 @@ router.post('/chat', async (req, res) => {
     if (!res.writableFinished) interruption.abort();
   });
 
-  envoyer('conversation', { id: conv.id });
+  envoyer('conversation', { id: conv.id, model: conv.modele.nom });
   try {
     await repondre(conv, texte, envoyer, interruption.signal);
     envoyer('done', {});
